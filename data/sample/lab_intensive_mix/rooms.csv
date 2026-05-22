@@ -1,0 +1,5 @@
+id,name,capacity,room_type
+R1,Comp Lab A,50,lab
+R2,Comp Lab B,45,lab
+R3,LT Gamma,100,lecture
+R4,Room C7,80,lecture

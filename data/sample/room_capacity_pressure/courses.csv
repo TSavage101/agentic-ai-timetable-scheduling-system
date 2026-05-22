@@ -1,0 +1,6 @@
+id,code,title,lecturer_id,student_count,sessions_per_week,room_type,preferred_slots,blocked_slots,level,department
+C1,CSC431,Advanced Algorithms,L1,150,2,lecture,MON_08|THU_08,,400,Computer Science
+C2,CSC433,Information Retrieval,L2,130,2,lecture,TUE_10|WED_10,,400,Computer Science
+C3,CSC435,Operating Systems II,L3,115,2,lecture,MON_12|FRI_10,,400,Computer Science
+C4,CIT401,Cloud Infrastructure,L4,75,2,lecture,TUE_12|THU_10,,400,Information Technology
+C5,CIT403,Data Center Operations,L5,68,2,lab,WED_12|FRI_12,,400,Information Technology

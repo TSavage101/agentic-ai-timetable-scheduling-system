@@ -1,0 +1,4 @@
+id,name,capacity,room_type
+R1,Main Auditorium,160,lecture
+R2,LT East,120,lecture
+R3,Engineering Lab,70,lab

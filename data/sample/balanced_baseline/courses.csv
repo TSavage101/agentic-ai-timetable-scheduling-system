@@ -1,0 +1,7 @@
+id,code,title,lecturer_id,student_count,sessions_per_week,room_type,preferred_slots,blocked_slots,level,department
+C1,CSC401,Artificial Intelligence,L1,85,2,lecture,MON_08|WED_10,FRI_16,400,Computer Science
+C2,CSC405,Machine Learning,L2,72,2,lecture,TUE_10|THU_08,,400,Computer Science
+C3,CSC407,Compiler Construction,L3,54,2,lecture,MON_12|THU_12,TUE_08,400,Computer Science
+C4,CSC409,Research Methods,L1,110,1,lecture,WED_12|FRI_10,,400,Computer Science
+C5,CSC411,Software Engineering II,L4,95,2,lecture,TUE_12|THU_10,MON_16,400,Computer Science
+C6,CIT301,Data Communications,L5,60,2,lab,MON_10|WED_08,,300,Information Technology

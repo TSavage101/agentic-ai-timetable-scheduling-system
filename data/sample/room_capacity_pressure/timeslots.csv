@@ -1,0 +1,15 @@
+id,day,start,end
+MON_08,Monday,08:00,10:00
+MON_10,Monday,10:00,12:00
+MON_12,Monday,12:00,14:00
+TUE_08,Tuesday,08:00,10:00
+TUE_10,Tuesday,10:00,12:00
+TUE_12,Tuesday,12:00,14:00
+WED_08,Wednesday,08:00,10:00
+WED_10,Wednesday,10:00,12:00
+WED_12,Wednesday,12:00,14:00
+THU_08,Thursday,08:00,10:00
+THU_10,Thursday,10:00,12:00
+THU_12,Thursday,12:00,14:00
+FRI_10,Friday,10:00,12:00
+FRI_12,Friday,12:00,14:00

@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agentic AI Timetable Scheduling System</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <main class="page-shell">
+    <section class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">Final Year Project Implementation</p>
+        <h1>Agentic AI-Driven Timetabling Scheduling System</h1>
+        <p class="lede">
+          A multi-agent scheduling platform that drafts, checks, repairs, and exports university timetables
+          while honoring hard constraints and optimizing soft preferences.
+        </p>
+      </div>
+      <div class="hero-card">
+        <h2>System Agents</h2>
+        <ul>
+          <li>Orchestrator Agent coordinates the pipeline.</li>
+          <li>Scheduling Agent creates the first feasible draft.</li>
+          <li>Constraint Agent validates hard and soft rules.</li>
+          <li>Conflict Resolution Agent improves the timetable iteratively.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <h2>Generate Timetable</h2>
+        <p>Use your own CSV files or leave the form empty to run the bundled sample dataset. You can also train the policy model before generation.</p>
+      </div>
+      <form action="/generate" method="post" enctype="multipart/form-data" class="upload-grid">
+        <label>
+          <span>Optimization Strategy</span>
+          <select name="strategy">
+            <option value="hybrid" {% if selected_strategy == "hybrid" %}selected{% endif %}>Hybrid Agentic + Genetic</option>
+            <option value="policy" {% if selected_strategy == "policy" %}selected{% endif %}>Policy-Guided Agent</option>
+            <option value="genetic" {% if selected_strategy == "genetic" %}selected{% endif %}>Genetic Optimizer</option>
+            <option value="heuristic" {% if selected_strategy == "heuristic" %}selected{% endif %}>Pure Heuristic</option>
+          </select>
+        </label>
+        <label>
+          <span>Training Episodes</span>
+          <input type="number" name="training_episodes" min="0" max="500" value="{{ training_episodes }}" />
+        </label>
+        <label>
+          <span>Genetic Generations</span>
+          <input type="number" name="generations" min="1" max="100" value="{{ generations }}" />
+        </label>
+        <label>
+          <span>Courses CSV</span>
+          <input type="file" name="courses" accept=".csv" />
+        </label>
+        <label>
+          <span>Lecturers CSV</span>
+          <input type="file" name="lecturers" accept=".csv" />
+        </label>
+        <label>
+          <span>Rooms CSV</span>
+          <input type="file" name="rooms" accept=".csv" />
+        </label>
+        <label>
+          <span>Timeslots CSV</span>
+          <input type="file" name="timeslots" accept=".csv" />
+        </label>
+        <button type="submit">Run Agentic Scheduler</button>
+      </form>
+    </section>
+
+    {% if result %}
+    <section class="results-grid">
+      <article class="metric-card">
+        <h3>Final Score</h3>
+        <strong>{{ result.final_evaluation.total_score }}</strong>
+        <p>Composite score from hard-constraint validity and soft-constraint quality using the {{ result.strategy }} strategy.</p>
+      </article>
+      <article class="metric-card">
+        <h3>Hard Constraints</h3>
+        <strong>{{ result.final_evaluation.metrics.hard_constraint_satisfaction }}%</strong>
+        <p>{{ result.final_evaluation.hard_violations | length }} violations detected after repair.</p>
+      </article>
+      <article class="metric-card">
+        <h3>Soft Quality</h3>
+        <strong>{{ result.final_evaluation.metrics.soft_constraint_quality }}%</strong>
+        <p>{{ result.final_evaluation.soft_violations | length }} preference penalties remain.</p>
+      </article>
+      <article class="metric-card">
+        <h3>Sessions Scheduled</h3>
+        <strong>{{ result.final_evaluation.metrics.scheduled_sessions }}</strong>
+        <p>{{ result.final_evaluation.metrics.unscheduled_sessions }} sessions remain unscheduled.</p>
+      </article>
+    </section>
+
+    <section class="results-grid">
+      <article class="panel">
+        <div class="panel-header">
+          <h2>Policy Model</h2>
+          <p>Current learned weights used to bias slot and room selection.</p>
+        </div>
+        <ul class="violation-list">
+          {% for name, value in result.policy_weights.items() %}
+          <li><strong>{{ name }}</strong>: {{ value }}</li>
+          {% endfor %}
+        </ul>
+      </article>
+      <article class="panel">
+        <div class="panel-header">
+          <h2>Training Summary</h2>
+          <p>Only populated when training episodes are greater than zero.</p>
+        </div>
+        <ul class="violation-list">
+          {% if result.training_summary %}
+            <li>Episodes: {{ result.training_summary.episodes }}</li>
+            <li>Model file: {{ result.training_summary.model_path }}</li>
+            <li>Recent reward history: {{ result.training_summary.history_tail }}</li>
+          {% else %}
+            <li>No training run was requested for this schedule.</li>
+          {% endif %}
+        </ul>
+      </article>
+      <article class="panel">
+        <div class="panel-header">
+          <h2>Optimization Summary</h2>
+          <p>Useful for showing how the search process improved the result.</p>
+        </div>
+        <ul class="violation-list">
+          {% if result.optimization_summary %}
+            {% for name, value in result.optimization_summary.items() %}
+            <li><strong>{{ name }}</strong>: {{ value }}</li>
+            {% endfor %}
+          {% else %}
+            <li>No extra optimization summary for this run.</li>
+          {% endif %}
+        </ul>
+      </article>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header row">
+        <div>
+          <h2>Generated Timetable</h2>
+          <p>The table below is ready for review and export.</p>
+        </div>
+        <a class="download-link" href="/download/{{ download_id }}">Download CSV</a>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Session</th>
+              <th>Course</th>
+              <th>Title</th>
+              <th>Lecturer</th>
+              <th>Day</th>
+              <th>Time</th>
+              <th>Room</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in result.schedule_rows %}
+            <tr>
+              <td>{{ row.session_id }}</td>
+              <td>{{ row.course_code }}</td>
+              <td>{{ row.course_title }}</td>
+              <td>{{ row.lecturer }}</td>
+              <td>{{ row.day }}</td>
+              <td>{{ row.time }}</td>
+              <td>{{ row.room }}</td>
+              <td>{{ row.status }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="results-grid">
+      <article class="panel">
+        <div class="panel-header">
+          <h2>Hard Constraint Findings</h2>
+          <p>Any issue here means the generated timetable still has invalid allocations.</p>
+        </div>
+        <ul class="violation-list">
+          {% if result.final_evaluation.hard_violations %}
+            {% for violation in result.final_evaluation.hard_violations %}
+            <li>{{ violation.message }}</li>
+            {% endfor %}
+          {% else %}
+            <li>No hard constraint violations found.</li>
+          {% endif %}
+        </ul>
+      </article>
+      <article class="panel">
+        <div class="panel-header">
+          <h2>Soft Constraint Findings</h2>
+          <p>These are quality issues rather than schedule-breaking conflicts.</p>
+        </div>
+        <ul class="violation-list">
+          {% if result.final_evaluation.soft_violations %}
+            {% for violation in result.final_evaluation.soft_violations %}
+            <li>{{ violation.message }}</li>
+            {% endfor %}
+          {% else %}
+            <li>No soft constraint penalties recorded.</li>
+          {% endif %}
+        </ul>
+      </article>
+    </section>
+    {% endif %}
+  </main>
+</body>
+</html>

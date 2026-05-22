@@ -1,0 +1,3 @@
+id,name,capacity,room_type
+R1,Only Hall,140,lecture
+R2,Only Lab,60,lab

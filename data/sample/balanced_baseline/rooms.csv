@@ -1,0 +1,5 @@
+id,name,capacity,room_type
+R1,LT 1,120,lecture
+R2,LT 2,90,lecture
+R3,Room B12,60,lecture
+R4,Software Lab,70,lab

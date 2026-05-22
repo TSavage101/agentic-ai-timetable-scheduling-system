@@ -1,0 +1,4 @@
+id,code,title,lecturer_id,student_count,sessions_per_week,room_type,preferred_slots,blocked_slots,level,department
+C1,CSC451,Advanced AI Seminar,L1,130,2,lecture,MON_08|MON_10,TUE_08|TUE_10,400,Computer Science
+C2,CSC453,Big Data Systems,L2,125,2,lecture,MON_08|MON_10,TUE_08|TUE_10,400,Computer Science
+C3,CIT451,Secure Systems Lab,L3,60,2,lab,MON_08|MON_10,TUE_08|TUE_10,400,Information Technology

@@ -1,0 +1,9 @@
+id,code,title,lecturer_id,student_count,sessions_per_week,room_type,preferred_slots,blocked_slots,level,department
+C1,CSC201,Discrete Structures II,L1,95,2,lecture,MON_08|WED_08,,200,Computer Science
+C2,CSC203,Object Oriented Programming,L2,90,2,lecture,TUE_08|THU_08,,200,Computer Science
+C3,CSC205,Computer Organization,L3,84,2,lecture,MON_10|WED_10,,200,Computer Science
+C4,CSC207,Data Structures,L4,88,2,lecture,TUE_10|THU_10,,200,Computer Science
+C5,CSC209,Probability for Computing,L5,80,2,lecture,MON_12|WED_12,,200,Computer Science
+C6,CIT211,System Analysis,L6,72,2,lecture,TUE_12|THU_12,,200,Information Technology
+C7,CIT213,Digital Logic Lab,L7,50,2,lab,MON_14|WED_14,,200,Information Technology
+C8,CIT215,Programming Practicum,L8,48,2,lab,TUE_14|THU_14,,200,Information Technology

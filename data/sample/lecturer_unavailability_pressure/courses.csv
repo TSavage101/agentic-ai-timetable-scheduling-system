@@ -1,0 +1,6 @@
+id,code,title,lecturer_id,student_count,sessions_per_week,room_type,preferred_slots,blocked_slots,level,department
+C1,CSC421,Knowledge Representation,L1,70,2,lecture,MON_08|WED_08,TUE_10,400,Computer Science
+C2,CSC423,Neural Networks,L2,65,2,lecture,TUE_12|THU_12,MON_10,400,Computer Science
+C3,CSC425,Human Computer Interaction,L3,80,2,lecture,MON_12|FRI_10,TUE_08,400,Computer Science
+C4,CSC427,Distributed Systems,L4,90,2,lecture,WED_10|THU_10,FRI_12,400,Computer Science
+C5,CIT305,Network Security,L5,55,2,lab,TUE_14|WED_12,MON_12,300,Information Technology

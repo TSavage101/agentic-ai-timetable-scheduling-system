@@ -1,0 +1,7 @@
+id,code,title,lecturer_id,student_count,sessions_per_week,room_type,preferred_slots,blocked_slots,level,department
+C1,CIT321,Computer Networks Lab,L1,48,2,lab,MON_10|WED_10,,300,Information Technology
+C2,CIT323,Embedded Systems Lab,L2,42,2,lab,TUE_10|THU_10,,300,Information Technology
+C3,CIT325,Cybersecurity Lab,L3,45,2,lab,WED_12|FRI_10,,300,Information Technology
+C4,CSC313,Database Systems,L4,88,2,lecture,MON_08|THU_08,,300,Computer Science
+C5,CSC315,Web Engineering,L5,92,2,lecture,TUE_12|FRI_12,,300,Computer Science
+C6,CSC317,Software Testing,L6,76,2,lecture,MON_12|WED_08,,300,Computer Science

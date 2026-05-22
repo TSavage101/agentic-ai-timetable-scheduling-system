@@ -1,0 +1,4 @@
+id,name,capacity,room_type
+R1,LT Alpha,120,lecture
+R2,LT Beta,90,lecture
+R3,AI Lab,60,lab

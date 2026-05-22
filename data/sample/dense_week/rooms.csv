@@ -1,0 +1,6 @@
+id,name,capacity,room_type
+R1,LT Red,110,lecture
+R2,LT Blue,100,lecture
+R3,LT Green,90,lecture
+R4,Logic Lab,55,lab
+R5,Programming Lab,50,lab
