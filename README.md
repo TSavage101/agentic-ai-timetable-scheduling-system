@@ -291,6 +291,10 @@ python -m uvicorn app.main:app --reload
 
 - [http://127.0.0.1:8000](http://127.0.0.1:8000)
 
+### Live deployment
+
+The project can also be deployed to Railway for public access and demonstration.
+
 ## How to use the app
 
 1. Open the homepage.
