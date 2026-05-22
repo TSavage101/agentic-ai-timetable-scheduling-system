@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="content-grid">
+  <article class="panel wide-panel">
+    <div class="panel-head">
+      <div>
+        <h2>Generation Workspace</h2>
+        <p>Shorter, cleaner input flow with grouped controls and repeatable rows instead of delimiter strings.</p>
+      </div>
+    </div>
+    <form action="/generate" method="post" enctype="multipart/form-data" class="form-grid" data-loading="true">
+      <div class="form-section">
+        <h3>Data Upload</h3>
+        <label><span>Courses CSV</span><input type="file" name="courses" accept=".csv" /></label>
+        <label><span>Lecturers CSV</span><input type="file" name="lecturers" accept=".csv" /></label>
+        <label><span>Rooms CSV</span><input type="file" name="rooms" accept=".csv" /></label>
+        <label><span>Timeslots CSV</span><input type="file" name="timeslots" accept=".csv" /></label>
+      </div>
+
+      <div class="form-section">
+        <h3>Optimization Strategy</h3>
+        <label>
+          <span>Mode</span>
+          <select name="strategy">
+            <option value="hybrid" {% if selected_strategy == "hybrid" %}selected{% endif %}>Hybrid Agentic + Genetic</option>
+            <option value="policy" {% if selected_strategy == "policy" %}selected{% endif %}>Policy-Guided Agent</option>
+            <option value="genetic" {% if selected_strategy == "genetic" %}selected{% endif %}>Genetic Optimizer</option>
+            <option value="heuristic" {% if selected_strategy == "heuristic" %}selected{% endif %}>Pure Heuristic</option>
+          </select>
+        </label>
+        <div class="inline-fields">
+          <label><span>Training Episodes</span><input type="number" name="training_episodes" min="0" max="500" value="{{ training_episodes }}" /></label>
+          <label><span>Generations</span><input type="number" name="generations" min="1" max="100" value="{{ generations }}" /></label>
+        </div>
+        <label><span>Natural Language Prompt</span><input type="text" name="nl_request" value="{{ result.natural_language_request if result else '' }}" placeholder="Generate a schedule where Dr. Adeyemi only teaches Tuesday mornings" /></label>
+      </div>
+
+      <div class="form-section">
+        <h3>Hard Constraints</h3>
+        <div class="toggle-grid">
+          <label class="toggle-row"><input type="checkbox" name="lecturer_double_booking" {% if constraint_defaults.lecturer_double_booking %}checked{% endif %} /><span>Prevent lecturer double-booking</span></label>
+          <label class="toggle-row"><input type="checkbox" name="room_exclusivity" {% if constraint_defaults.room_exclusivity %}checked{% endif %} /><span>Respect room exclusivity</span></label>
+          <label class="toggle-row"><input type="checkbox" name="room_capacity_enforced" {% if constraint_defaults.room_capacity_enforced %}checked{% endif %} /><span>Enforce room capacity</span></label>
+          <label class="toggle-row"><input type="checkbox" name="room_type_enforced" {% if constraint_defaults.room_type_enforced %}checked{% endif %} /><span>Enforce room type</span></label>
+          <label class="toggle-row"><input type="checkbox" name="fatigue_limit_enabled" {% if constraint_defaults.fatigue_limit_enabled %}checked{% endif %} /><span>Enable fatigue protection</span></label>
+        </div>
+        <label><span>Maximum Consecutive Sessions</span><input type="number" name="max_consecutive_sessions" min="1" max="6" value="{{ constraint_defaults.max_consecutive_sessions }}" /></label>
+      </div>
+
+      <div class="form-section">
+        <h3>Soft Constraint Weighting</h3>
+        <label><span>Preferred Slot</span><input type="range" name="preferred_slot_weight" min="0" max="5" step="0.1" value="{{ weight_defaults.preferred_slot }}" /></label>
+        <label><span>Minimize Idle Time</span><input type="range" name="idle_time_weight" min="0" max="5" step="0.1" value="{{ weight_defaults.minimize_idle_time }}" /></label>
+        <label><span>Geographic Grouping</span><input type="range" name="geographic_weight" min="0" max="5" step="0.1" value="{{ weight_defaults.geographic_grouping }}" /></label>
+        <label><span>Fatigue Balance</span><input type="range" name="fatigue_weight" min="0" max="5" step="0.1" value="{{ weight_defaults.fatigue_balance }}" /></label>
+        <label><span>Room Fit</span><input type="range" name="room_fit_weight" min="0" max="5" step="0.1" value="{{ weight_defaults.room_fit }}" /></label>
+      </div>
+
+      <div class="form-section wide-span" data-repeater>
+        <div class="section-headline">
+          <h3>Lecturer Preference Portal</h3>
+          <button type="button" class="ghost-button" data-add-row>Add Lecturer Preference</button>
+        </div>
+        <div class="repeater-target" data-repeater-target>
+          {% for row in preference_rows %}
+          <div class="repeater-row" data-row>
+            <label>
+              <span>Lecturer</span>
+              <select name="lecturer_pref_lecturer_id">
+                <option value="">Choose lecturer</option>
+                {% for lecturer in lecturer_options %}
+                <option value="{{ lecturer.id }}" {% if row.lecturer_id == lecturer.id %}selected{% endif %}>{{ lecturer.name }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label><span>Request</span><input type="text" name="lecturer_pref_request" value="{{ row.request_text }}" placeholder="Avoid late Friday sessions" /></label>
+            <label>
+              <span>Preferred Slot</span>
+              <select name="lecturer_pref_slot">
+                <option value="">Any slot</option>
+                {% for slot in slot_options %}
+                <option value="{{ slot.id }}" {% if row.slot == slot.id %}selected{% endif %}>{{ slot.day }} {{ slot.start }}-{{ slot.end }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label>
+              <span>Preferred Day</span>
+              <select name="lecturer_pref_day">
+                <option value="">Any day</option>
+                {% for day in ["Monday","Tuesday","Wednesday","Thursday","Friday"] %}
+                <option value="{{ day }}" {% if row.day == day %}selected{% endif %}>{{ day }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <button type="button" class="ghost-button danger" data-remove-row>Remove</button>
+          </div>
+          {% endfor %}
+        </div>
+        <template>
+          <div class="repeater-row" data-row>
+            <label>
+              <span>Lecturer</span>
+              <select name="lecturer_pref_lecturer_id">
+                <option value="">Choose lecturer</option>
+                {% for lecturer in lecturer_options %}
+                <option value="{{ lecturer.id }}">{{ lecturer.name }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label><span>Request</span><input type="text" name="lecturer_pref_request" placeholder="Avoid late Friday sessions" /></label>
+            <label>
+              <span>Preferred Slot</span>
+              <select name="lecturer_pref_slot">
+                <option value="">Any slot</option>
+                {% for slot in slot_options %}
+                <option value="{{ slot.id }}">{{ slot.day }} {{ slot.start }}-{{ slot.end }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label>
+              <span>Preferred Day</span>
+              <select name="lecturer_pref_day">
+                <option value="">Any day</option>
+                {% for day in ["Monday","Tuesday","Wednesday","Thursday","Friday"] %}
+                <option value="{{ day }}">{{ day }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <button type="button" class="ghost-button danger" data-remove-row>Remove</button>
+          </div>
+        </template>
+      </div>
+
+      <div class="form-section">
+        <h3>Departmental Guidelines</h3>
+        <label><span>Guideline Notes</span><textarea name="departmental_guidelines" rows="6" placeholder="400-level core courses should avoid Friday late slots.">{{ result.guidelines if result else '' }}</textarea></label>
+      </div>
+
+      <div class="form-section wide-span" data-repeater>
+        <div class="section-headline">
+          <h3>Dynamic Disruptions</h3>
+          <button type="button" class="ghost-button" data-add-row>Add Disruption</button>
+        </div>
+        <div class="repeater-target" data-repeater-target>
+          {% for row in disruption_rows %}
+          <div class="repeater-row" data-row>
+            <label>
+              <span>Type</span>
+              <select name="disruption_type">
+                <option value="">Choose type</option>
+                <option value="lecturer_unavailable" {% if row.disruption_type == "lecturer_unavailable" %}selected{% endif %}>Lecturer Unavailable</option>
+              </select>
+            </label>
+            <label><span>Target ID</span><input type="text" name="disruption_target" value="{{ row.target_id }}" placeholder="L1" /></label>
+            <label>
+              <span>Impacted Slot</span>
+              <select name="disruption_slot">
+                <option value="">Choose slot</option>
+                {% for slot in slot_options %}
+                <option value="{{ slot.id }}" {% if row.slot_id == slot.id %}selected{% endif %}>{{ slot.day }} {{ slot.start }}-{{ slot.end }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label><span>Note</span><input type="text" name="disruption_note" value="{{ row.note }}" placeholder="Emergency absence" /></label>
+            <button type="button" class="ghost-button danger" data-remove-row>Remove</button>
+          </div>
+          {% endfor %}
+        </div>
+        <template>
+          <div class="repeater-row" data-row>
+            <label>
+              <span>Type</span>
+              <select name="disruption_type">
+                <option value="">Choose type</option>
+                <option value="lecturer_unavailable">Lecturer Unavailable</option>
+              </select>
+            </label>
+            <label><span>Target ID</span><input type="text" name="disruption_target" placeholder="L1" /></label>
+            <label>
+              <span>Impacted Slot</span>
+              <select name="disruption_slot">
+                <option value="">Choose slot</option>
+                {% for slot in slot_options %}
+                <option value="{{ slot.id }}">{{ slot.day }} {{ slot.start }}-{{ slot.end }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label><span>Note</span><input type="text" name="disruption_note" placeholder="Emergency absence" /></label>
+            <button type="button" class="ghost-button danger" data-remove-row>Remove</button>
+          </div>
+        </template>
+      </div>
+
+      <div class="submit-row">
+        <button type="submit">Generate Timetable</button>
+      </div>
+    </form>
+  </article>
+</section>
+{% endblock %}

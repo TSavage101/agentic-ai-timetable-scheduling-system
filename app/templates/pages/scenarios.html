@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block content %}
+{% if result %}
+<section class="content-grid">
+  <article class="panel">
+    <div class="panel-head">
+      <div>
+        <h2>What-If Comparison</h2>
+        <p>Draft versus final optimization comparison for trade-off analysis.</p>
+      </div>
+    </div>
+    <div class="comparison-grid">
+      {% for item in result.comparison %}
+      <div class="compare-card">
+        <span>{{ item.label }}</span>
+        <strong>{{ item.value }}</strong>
+      </div>
+      {% endfor %}
+    </div>
+  </article>
+  <article class="panel">
+    <div class="panel-head">
+      <div>
+        <h2>Optimization History</h2>
+        <p>Search path quality over repair and evolutionary passes.</p>
+      </div>
+    </div>
+    <div class="history-rail">
+      {% if result.optimization_summary and result.optimization_summary.history %}
+        {% for score in result.optimization_summary.history %}
+        <div class="history-bar"><span style="height: {{ score }}%"></span><label>{{ loop.index }}</label></div>
+        {% endfor %}
+      {% else %}
+      <div class="empty-inline">No generational history for this run.</div>
+      {% endif %}
+    </div>
+  </article>
+  <article class="panel">
+    <div class="panel-head">
+      <div>
+        <h2>Scenario Interpretation</h2>
+        <p>How to explain the current run to a client or panel.</p>
+      </div>
+    </div>
+    <ul class="stack-list">
+      <li><strong>Draft State</strong><p>The draft gives the first feasible answer before deeper repair and optimization.</p></li>
+      <li><strong>Final State</strong><p>The final state balances validity, comfort, and utilization under the chosen strategy.</p></li>
+      <li><strong>Manual What-If</strong><p>Use the grid page to test a human override and immediately re-evaluate trade-offs.</p></li>
+    </ul>
+  </article>
+</section>
+{% else %}
+<section class="empty-state">
+  <h2>No scenario data yet</h2>
+  <p>Generate a timetable run first to unlock comparison views.</p>
+</section>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agentic AI Timetable Scheduling System</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand-block">
+        <span class="brand-mark">AT</span>
+        <div>
+          <strong>Agentic Timetable</strong>
+          <p>Operations Console</p>
+        </div>
+      </div>
+      <nav class="nav-list">
+        {% for item in nav_items %}
+        <a href="{{ item.href }}" class="nav-link {% if active_page == item.key %}active{% endif %}">
+          <span>{{ item.label }}</span>
+        </a>
+        {% endfor %}
+      </nav>
+      <div class="sidebar-card">
+        <h3>Design Direction</h3>
+        <p>Multi-page admin workflow, focused forms, subtle motion, and responsive scheduling views.</p>
+      </div>
+    </aside>
+
+    <div class="shell-main">
+      <header class="topbar">
+        <button class="menu-toggle" type="button" id="menu-toggle">Menu</button>
+        <div>
+          <p class="eyebrow">University Scheduling Platform</p>
+          <h1>{{ page_title }}</h1>
+          <p class="page-subtitle">{{ page_subtitle }}</p>
+        </div>
+        <div class="topbar-meta">
+          <span class="status-pill {% if result and result.approved %}success{% elif result %}active{% else %}idle{% endif %}">
+            {% if result and result.approved %}Approved{% elif result %}Live Run{% else %}No Active Run{% endif %}
+          </span>
+          {% if run_id %}
+          <span class="run-badge">Run {{ run_id[:8] }}</span>
+          {% endif %}
+        </div>
+      </header>
+
+      {% if message %}
+      <div class="message-banner fade-in">{{ message }}</div>
+      {% endif %}
+
+      <main class="page-content">
+        {% block content %}{% endblock %}
+      </main>
+    </div>
+  </div>
+
+  <div class="loading-overlay" id="loading-overlay" aria-hidden="true">
+    <div class="loading-card">
+      <div class="spinner"></div>
+      <h3>Working on your timetable</h3>
+      <p>Training policies, optimizing slots, and preparing the dashboard...</p>
+      <div class="loading-progress"><span></span></div>
+    </div>
+  </div>
+
+  <script>
+    const menuToggle = document.getElementById('menu-toggle');
+    const sidebar = document.getElementById('sidebar');
+    if (menuToggle && sidebar) {
+      menuToggle.addEventListener('click', () => sidebar.classList.toggle('open'));
+    }
+
+    document.querySelectorAll('form[data-loading="true"]').forEach((form) => {
+      form.addEventListener('submit', () => {
+        const overlay = document.getElementById('loading-overlay');
+        if (overlay) {
+          overlay.classList.add('show');
+          overlay.setAttribute('aria-hidden', 'false');
+        }
+      });
+    });
+
+    document.querySelectorAll('[data-repeater]').forEach((section) => {
+      const addBtn = section.querySelector('[data-add-row]');
+      const template = section.querySelector('template');
+      const target = section.querySelector('[data-repeater-target]');
+      if (!addBtn || !template || !target) return;
+      addBtn.addEventListener('click', () => {
+        const fragment = template.content.cloneNode(true);
+        target.appendChild(fragment);
+      });
+      section.addEventListener('click', (event) => {
+        const trigger = event.target.closest('[data-remove-row]');
+        if (!trigger) return;
+        const row = trigger.closest('[data-row]');
+        if (row) row.remove();
+      });
+    });
+
+    const dragSession = document.getElementById('drag-session-id');
+    const dragSlot = document.getElementById('drag-slot-id');
+    const adjustForm = document.getElementById('adjust-form');
+    document.querySelectorAll('.session-card[draggable="true"]').forEach((card) => {
+      card.addEventListener('dragstart', (event) => {
+        event.dataTransfer.setData('text/plain', card.dataset.sessionId);
+      });
+    });
+    document.querySelectorAll('.drop-cell').forEach((cell) => {
+      cell.addEventListener('dragover', (event) => event.preventDefault());
+      cell.addEventListener('drop', (event) => {
+        event.preventDefault();
+        if (!adjustForm || !dragSession || !dragSlot) return;
+        const sessionId = event.dataTransfer.getData('text/plain');
+        const slotId = cell.dataset.slotId;
+        if (!sessionId || !slotId) return;
+        dragSession.value = sessionId;
+        dragSlot.value = slotId;
+        adjustForm.submit();
+      });
+    });
+  </script>
+</body>
+</html>

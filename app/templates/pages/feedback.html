@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block content %}
+{% if result %}
+<section class="content-grid two-wide">
+  <article class="panel">
+    <div class="panel-head">
+      <div>
+        <h2>Administrator Feedback</h2>
+        <p>Rate the current timetable and capture improvement notes.</p>
+      </div>
+    </div>
+    <form action="/feedback" method="post" class="form-grid compact-form" data-loading="true">
+      <input type="hidden" name="run_id" value="{{ run_id }}" />
+      <label><span>Rating</span><input type="number" name="feedback_rating" min="1" max="5" value="4" /></label>
+      <label class="wide-span"><span>Comment</span><textarea name="feedback_comment" rows="6" placeholder="Explain what should be improved or preserved in the next run."></textarea></label>
+      <div class="submit-row">
+        <button type="submit">Save Feedback</button>
+      </div>
+    </form>
+  </article>
+  <article class="panel">
+    <div class="panel-head">
+      <div>
+        <h2>Feedback History</h2>
+        <p>Persistent notes captured for this run.</p>
+      </div>
+    </div>
+    <ul class="stack-list">
+      {% if result.feedback_log %}
+        {% for item in result.feedback_log %}
+        <li><strong>{{ item.rating }}/5</strong><p>{{ item.comment }}</p></li>
+        {% endfor %}
+      {% else %}
+      <li><strong>No feedback yet</strong><p>Use the form to record administrator judgment and improvement signals.</p></li>
+      {% endif %}
+    </ul>
+  </article>
+</section>
+{% else %}
+<section class="empty-state">
+  <h2>Feedback follows a generated run</h2>
+  <p>Create a timetable first so stakeholders have something concrete to review.</p>
+</section>
+{% endif %}
+{% endblock %}

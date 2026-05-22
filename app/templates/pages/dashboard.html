@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block content %}
+{% if result %}
+<section class="stats-grid">
+  <article class="stat-card float-in">
+    <span>Total Courses</span>
+    <strong>{{ result.dashboard.total_courses }}</strong>
+  </article>
+  <article class="stat-card float-in">
+    <span>Total Lecturers</span>
+    <strong>{{ result.dashboard.total_lecturers }}</strong>
+  </article>
+  <article class="stat-card float-in">
+    <span>Total Rooms</span>
+    <strong>{{ result.dashboard.total_rooms }}</strong>
+  </article>
+  <article class="stat-card float-in">
+    <span>Operational Status</span>
+    <strong>{{ result.dashboard.operational_status }}</strong>
+  </article>
+</section>
+
+<section class="content-grid two-wide">
+  <article class="panel">
+    <div class="panel-head">
+      <div>
+        <h2>Overview</h2>
+        <p>High-level score, quality, and optimization health.</p>
+      </div>
+      <a href="/timetable?run_id={{ run_id }}" class="text-link">Open Grid</a>
+    </div>
+    <div class="mini-metrics">
+      <div><span>Final Score</span><strong>{{ result.final_evaluation.total_score }}</strong></div>
+      <div><span>Hard Constraints</span><strong>{{ result.final_evaluation.metrics.hard_constraint_satisfaction }}%</strong></div>
+      <div><span>Soft Quality</span><strong>{{ result.final_evaluation.metrics.soft_constraint_quality }}%</strong></div>
+      <div><span>Sessions Scheduled</span><strong>{{ result.final_evaluation.metrics.scheduled_sessions|int }}</strong></div>
+    </div>
+    <div class="progress-rail">
+      <label>Optimization Progress</label>
+      <div class="bar"><span style="width: {{ result.activity_log[-1].progress }}%"></span></div>
+    </div>
+  </article>
+
+  <article class="panel">
+    <div class="panel-head">
+      <div>
+        <h2>Agent Activity</h2>
+        <p>Live-style timeline of the collaborating agents.</p>
+      </div>
+      <span class="text-chip">{{ result.strategy|title }}</span>
+    </div>
+    <div class="activity-list">
+      {% for event in result.activity_log %}
+      <div class="activity-item">
+        <span class="activity-progress">{{ event.progress }}%</span>
+        <div>
+          <strong>{{ event.agent }}</strong>
+          <p>{{ event.action }}: {{ event.detail }}</p>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </article>
+</section>
+
+<section class="content-grid">
+  <article class="panel">
+    <div class="panel-head">
+      <div>
+        <h2>Weekly Preview</h2>
+        <p>Compact look at the generated timetable before deep inspection.</p>
+      </div>
+      <a href="/download/{{ download_id }}" class="pill-link">Download CSV</a>
+    </div>
+    <div class="preview-table">
+      <table>
+        <thead>
+          <tr><th>Session</th><th>Day</th><th>Time</th><th>Room</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          {% for row in result.schedule_rows[:6] %}
+          <tr>
+            <td>{{ row.course_code }}</td>
+            <td>{{ row.day }}</td>
+            <td>{{ row.time }}</td>
+            <td>{{ row.room }}</td>
+            <td>{{ row.status }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </article>
+
+  <article class="panel">
+    <div class="panel-head">
+      <div>
+        <h2>Quality Signals</h2>
+        <p>More realistic health indicators beyond simple validity.</p>
+      </div>
+    </div>
+    <div class="signal-list">
+      <div><span>Fatigue Index</span><strong>{{ result.final_evaluation.metrics.fatigue_index }}%</strong></div>
+      <div><span>Idle Index</span><strong>{{ result.final_evaluation.metrics.student_idle_index }}%</strong></div>
+      <div><span>Room Utilization</span><strong>{{ result.final_evaluation.metrics.room_utilization }}%</strong></div>
+      <div><span>Geographic Penalty</span><strong>{{ result.final_evaluation.metrics.geographic_penalty_index }}%</strong></div>
+    </div>
+  </article>
+
+  <article class="panel">
+    <div class="panel-head">
+      <div>
+        <h2>Conflict Suggestions</h2>
+        <p>Suggested alternatives and admin-safe adjustment ideas.</p>
+      </div>
+    </div>
+    <ul class="stack-list">
+      {% for suggestion in result.resolution_suggestions[:4] %}
+      <li>
+        <strong>{{ suggestion.session_id }}</strong>
+        <p>{{ suggestion.message }}</p>
+        {% if suggestion.alternatives %}
+        <span class="muted-inline">{{ suggestion.alternatives|join(', ') }}</span>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+  </article>
+</section>
+{% else %}
+<section class="empty-state fade-in">
+  <h2>No active scheduling run yet</h2>
+  <p>Start from the Generate page to upload data, configure the strategy, and create a timetable.</p>
+  <a href="/generate" class="primary-link">Go to Generate</a>
+</section>
+{% endif %}
+{% endblock %}

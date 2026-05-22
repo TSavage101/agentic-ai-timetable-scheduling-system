@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block content %}
+{% if result %}
+<section class="content-grid two-wide">
+  <article class="panel">
+    <div class="panel-head">
+      <div>
+        <h2>Decision Audit Log</h2>
+        <p>Traceable reasoning behind important scheduling choices.</p>
+      </div>
+    </div>
+    <ul class="stack-list">
+      {% for audit in result.audit_log %}
+      <li>
+        <strong>{{ audit.title }}</strong>
+        <p>{{ audit.explanation }}</p>
+        <span class="muted-inline">Impact: {{ audit.impact }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+  </article>
+  <article class="panel dark-panel">
+    <div class="panel-head">
+      <div>
+        <h2>Agent Argument Terminal</h2>
+        <p>Readable internal discussion excerpts for explainability.</p>
+      </div>
+    </div>
+    <div class="terminal">
+      {% for line in result.argument_terminal %}
+      <p>{{ line }}</p>
+      {% endfor %}
+    </div>
+  </article>
+</section>
+{% else %}
+<section class="empty-state">
+  <h2>No audit trail available yet</h2>
+  <p>Once a run exists, the system will surface its reasoning here.</p>
+</section>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block content %}
+{% if result %}
+<section class="content-grid two-wide">
+  <article class="panel">
+    <div class="panel-head">
+      <div>
+        <h2>Interactive Timetable Grid</h2>
+        <p>Drag any session card into a different cell for a what-if adjustment.</p>
+      </div>
+      <div class="inline-actions">
+        <a href="/download/{{ download_id }}" class="pill-link">Export CSV</a>
+        <form action="/approve" method="post">
+          <input type="hidden" name="run_id" value="{{ run_id }}" />
+          <button type="submit">{% if result.approved %}Approved{% else %}Approve{% endif %}</button>
+        </form>
+      </div>
+    </div>
+    <div class="grid-wrap">
+      <table class="timetable-grid">
+        <thead>
+          <tr>
+            <th>Time</th>
+            {% for day in result.grid.days %}
+            <th>{{ day }}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for time in result.grid.times %}
+          <tr>
+            <td class="time-cell">{{ time }}</td>
+            {% for day in result.grid.days %}
+            {% set cell_key = day ~ '|' ~ time %}
+            <td class="drop-cell" data-slot-id="{% for slot in slot_options %}{% if slot.day == day and (slot.start ~ ' - ' ~ slot.end) == time %}{{ slot.id }}{% endif %}{% endfor %}">
+              {% for card in result.grid.cells.get(cell_key, []) %}
+              <div class="session-card {{ card.status }}" draggable="true" data-session-id="{{ card.session_id }}">
+                <strong>{{ card.course_code }}</strong>
+                <span>{{ card.room }}</span>
+                <span>{{ card.lecturer }}</span>
+                {% if card.violations %}
+                <em>{{ card.violations[0] }}</em>
+                {% endif %}
+              </div>
+              {% endfor %}
+            </td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <form id="adjust-form" action="/adjust" method="post" data-loading="true">
+      <input type="hidden" name="run_id" value="{{ run_id }}" />
+      <input type="hidden" name="session_id" id="drag-session-id" />
+      <input type="hidden" name="target_slot_id" id="drag-slot-id" />
+    </form>
+  </article>
+
+  <article class="panel">
+    <div class="panel-head">
+      <div>
+        <h2>Resolution Drawer</h2>
+        <p>Recommended alternatives when a conflict or quality warning exists.</p>
+      </div>
+    </div>
+    <ul class="stack-list">
+      {% for suggestion in result.resolution_suggestions %}
+      <li>
+        <strong>{{ suggestion.session_id }}</strong>
+        <p>{{ suggestion.message }}</p>
+        {% if suggestion.alternatives %}
+        <span class="muted-inline">{{ suggestion.alternatives|join(', ') }}</span>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+  </article>
+</section>
+
+<section class="content-grid">
+  <article class="panel">
+    <div class="panel-head">
+      <div>
+        <h2>Detailed Table</h2>
+        <p>Structured review table for the current schedule snapshot.</p>
+      </div>
+    </div>
+    <div class="preview-table">
+      <table>
+        <thead>
+          <tr>
+            <th>Session</th><th>Course</th><th>Lecturer</th><th>Day</th><th>Time</th><th>Room</th><th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in result.schedule_rows %}
+          <tr>
+            <td>{{ row.session_id }}</td>
+            <td>{{ row.course_code }}</td>
+            <td>{{ row.lecturer }}</td>
+            <td>{{ row.day }}</td>
+            <td>{{ row.time }}</td>
+            <td>{{ row.room }}</td>
+            <td>{{ row.status }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </article>
+  <article class="panel">
+    <div class="panel-head">
+      <div>
+        <h2>Live Conflict Highlighting</h2>
+        <p>Warnings are also surfaced directly on the schedule cards.</p>
+      </div>
+    </div>
+    <ul class="stack-list">
+      {% if result.final_evaluation.hard_violations %}
+      {% for violation in result.final_evaluation.hard_violations %}
+      <li><strong>Hard</strong><p>{{ violation.message }}</p></li>
+      {% endfor %}
+      {% else %}
+      <li><strong>Clean</strong><p>No hard violations remain in the current version.</p></li>
+      {% endif %}
+      {% for violation in result.final_evaluation.soft_violations[:5] %}
+      <li><strong>Soft</strong><p>{{ violation.message }}</p></li>
+      {% endfor %}
+    </ul>
+  </article>
+</section>
+{% else %}
+<section class="empty-state">
+  <h2>No timetable generated yet</h2>
+  <p>Generate a run first, then this page becomes the main interactive planning surface.</p>
+  <a href="/generate" class="primary-link">Go to Generate</a>
+</section>
+{% endif %}
+{% endblock %}

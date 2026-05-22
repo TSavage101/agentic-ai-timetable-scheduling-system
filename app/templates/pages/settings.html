@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block content %}
+{% if result %}
+<section class="content-grid">
+  <article class="panel">
+    <div class="panel-head">
+      <div>
+        <h2>Current Constraint Profile</h2>
+        <p>Operational rules active during the current run.</p>
+      </div>
+    </div>
+    <div class="settings-list">
+      <div><span>Lecturer Double Booking</span><strong>{{ "On" if constraint_defaults.lecturer_double_booking else "Off" }}</strong></div>
+      <div><span>Room Exclusivity</span><strong>{{ "On" if constraint_defaults.room_exclusivity else "Off" }}</strong></div>
+      <div><span>Room Capacity</span><strong>{{ "On" if constraint_defaults.room_capacity_enforced else "Off" }}</strong></div>
+      <div><span>Room Type</span><strong>{{ "On" if constraint_defaults.room_type_enforced else "Off" }}</strong></div>
+      <div><span>Fatigue Protection</span><strong>{{ "On" if constraint_defaults.fatigue_limit_enabled else "Off" }}</strong></div>
+      <div><span>Max Consecutive Sessions</span><strong>{{ constraint_defaults.max_consecutive_sessions }}</strong></div>
+    </div>
+  </article>
+  <article class="panel">
+    <div class="panel-head">
+      <div>
+        <h2>Soft Weight Profile</h2>
+        <p>Priority weights that shaped the schedule quality trade-offs.</p>
+      </div>
+    </div>
+    <div class="settings-list">
+      <div><span>Preferred Slot</span><strong>{{ weight_defaults.preferred_slot }}</strong></div>
+      <div><span>Idle Time</span><strong>{{ weight_defaults.minimize_idle_time }}</strong></div>
+      <div><span>Geographic Grouping</span><strong>{{ weight_defaults.geographic_grouping }}</strong></div>
+      <div><span>Fatigue Balance</span><strong>{{ weight_defaults.fatigue_balance }}</strong></div>
+      <div><span>Room Fit</span><strong>{{ weight_defaults.room_fit }}</strong></div>
+    </div>
+  </article>
+  <article class="panel">
+    <div class="panel-head">
+      <div>
+        <h2>Policy Weights</h2>
+        <p>Learned model signals used during policy-guided search.</p>
+      </div>
+    </div>
+    <ul class="stack-list">
+      {% for name, value in result.policy_weights.items() %}
+      <li><strong>{{ name }}</strong><p>{{ value }}</p></li>
+      {% endfor %}
+    </ul>
+  </article>
+</section>
+{% else %}
+<section class="empty-state">
+  <h2>No settings snapshot yet</h2>
+  <p>Generate a run to see the exact profile used by the system.</p>
+</section>
+{% endif %}
+{% endblock %}

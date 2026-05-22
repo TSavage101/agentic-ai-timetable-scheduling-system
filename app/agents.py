@@ -790,6 +790,8 @@ class OrchestratorAgent:
             "draft_evaluation": draft_evaluation,
             "final_evaluation": final_evaluation,
             "schedule_rows": schedule_rows,
+            "assignments": [asdict(item) for item in assignments],
+            "draft_assignments": [asdict(item) for item in draft_assignments],
             "grid": grid,
             "training_summary": training_summary,
             "optimization_summary": optimization_summary,

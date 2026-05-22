@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block content %}
+{% if result %}
+<section class="content-grid">
+  <article class="panel">
+    <div class="panel-head">
+      <div>
+        <h2>Room Resource Manager</h2>
+        <p>Capacities, room types, locations, and managed equipment.</p>
+      </div>
+    </div>
+    <div class="resource-list">
+      {% for room in room_options %}
+      <div class="resource-card">
+        <strong>{{ room.name }}</strong>
+        <span>{{ room.capacity }} seats</span>
+        <span>{{ room.room_type }} · {{ room.location }}</span>
+        <span>{{ room.equipment|join(', ') if room.equipment else 'Standard equipment' }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </article>
+  <article class="panel">
+    <div class="panel-head">
+      <div>
+        <h2>Lecturer Preferences</h2>
+        <p>Saved preference rows from the current run.</p>
+      </div>
+    </div>
+    <ul class="stack-list">
+      {% if lecturer_options %}
+        {% for pref in preference_rows %}
+        <li>
+          <strong>{{ pref.lecturer_id or 'Unassigned Lecturer' }}</strong>
+          <p>{{ pref.request_text or 'No free-text request provided.' }}</p>
+          <span class="muted-inline">Slot: {{ pref.slot or 'Any' }} · Day: {{ pref.day or 'Any' }}</span>
+        </li>
+        {% endfor %}
+      {% else %}
+      <li><strong>No lecturer data</strong><p>Upload data to populate the resource manager.</p></li>
+      {% endif %}
+    </ul>
+  </article>
+  <article class="panel">
+    <div class="panel-head">
+      <div>
+        <h2>Disruption Watchlist</h2>
+        <p>Currently injected disruptions or emergency changes.</p>
+      </div>
+    </div>
+    <ul class="stack-list">
+      {% for item in disruption_rows %}
+      <li><strong>{{ item.disruption_type or 'No active disruption' }}</strong><p>{{ item.target_id }} {{ item.slot_id }} {{ item.note }}</p></li>
+      {% endfor %}
+    </ul>
+  </article>
+</section>
+{% else %}
+<section class="empty-state">
+  <h2>Resources appear here after a run</h2>
+  <p>This page becomes the operations inventory once a dataset has been loaded.</p>
+</section>
+{% endif %}
+{% endblock %}
