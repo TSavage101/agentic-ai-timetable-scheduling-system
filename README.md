@@ -9,12 +9,19 @@ This version goes beyond a basic rule engine. It includes:
 - a genetic optimization path
 - a heuristic repair layer
 - a web interface for experimentation and demonstration
+- a central administrator dashboard
+- manual what-if adjustment support
+- decision audit, feedback, and approval workflows
 
 ## What the system does
 
 - Generates university course timetables from CSV input data
 - Satisfies hard constraints such as lecturer availability, room capacity, room compatibility, and no double-booking
 - Improves soft constraints such as preferred slot usage, day spread, and reduced late classes
+- Allows hard-constraint toggling and soft-constraint weighting from the UI
+- Provides a 2D timetable grid for interactive schedule review
+- Captures lecturer requests, departmental rules, disruptions, and administrator feedback
+- Shows agent activity, optimization progress, audit logs, and what-if comparisons
 - Allows different scheduling modes:
   - `Pure Heuristic`
   - `Policy-Guided Agent`
@@ -298,18 +305,51 @@ The project can also be deployed to Railway for public access and demonstration.
 ## How to use the app
 
 1. Open the homepage.
-2. Choose an optimization strategy.
-3. Set `Training Episodes` if you want the policy model to learn before scheduling.
-4. Set `Genetic Generations` if using genetic or hybrid mode.
-5. Upload your CSV files or leave the form empty to use the sample dataset.
-6. Click `Run Agentic Scheduler`.
+2. Upload your CSV files or leave the form empty to use the sample dataset.
+3. Choose an optimization strategy.
+4. Configure hard constraints and soft-constraint weights.
+5. Add lecturer requests, departmental guidelines, natural-language instructions, or disruption events if needed.
+6. Set `Training Episodes` if you want the policy model to learn before scheduling.
+7. Set `Genetic Generations` if using genetic or hybrid mode.
+8. Click `Run Agentic Scheduler`.
 7. Review:
    - scores
    - hard constraint results
    - soft constraint results
    - learned policy weights
    - optimization summary
-8. Download the timetable as CSV.
+   - agent activity
+   - decision audit log
+   - live 2D timetable grid
+9. Drag timetable blocks on the grid to test a what-if manual adjustment.
+10. Approve the timetable or record administrator feedback.
+11. Download the timetable as CSV.
+
+## Additional client requirements implemented
+
+The client added several dashboard-oriented requirements after the initial build. These are now represented in the interface and backend workflow:
+
+- central administrator dashboard
+- data ingestion module
+- hard constraint configuration panel
+- soft constraint weighting sliders
+- agent activity visualizer
+- interactive 2D timetable grid
+- drag-and-drop adjustment tool
+- live conflict highlighting
+- agentic resolution suggestions
+- administrator approval workflow
+- system feedback input form
+- what-if scenario viewer
+- lecturer preference portal
+- room resource manager
+- departmental guideline editor
+- optimization progress tracker
+- decision audit log
+- dynamic disruption tool
+- natural-language timetable generation
+- live agent argument terminal
+- faculty and student fatigue index modeling
 
 ### Recommended demo settings
 

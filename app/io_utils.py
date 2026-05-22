@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import io
+from dataclasses import replace
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional
+from typing import Dict, Iterable, List
 
 import pandas as pd
 
@@ -52,6 +53,8 @@ def load_problem_data(
             name=str(row["name"]),
             capacity=int(row["capacity"]),
             room_type=str(row.get("room_type", "lecture")),
+            location=str(row.get("location", "Main Block")),
+            equipment=frozenset(_split_values(row.get("equipment"))),
         )
 
     slots: Dict[str, TimeSlot] = {}
@@ -79,6 +82,7 @@ def load_problem_data(
             blocked_slots=frozenset(_split_values(row.get("blocked_slots"))),
             level=str(row.get("level", "")),
             department=str(row.get("department", "")),
+            equipment_needed=frozenset(_split_values(row.get("equipment_needed"))),
         )
         courses[course_id] = course
         for index in range(1, course.sessions_per_week + 1):
@@ -96,6 +100,16 @@ def load_problem_data(
         rooms=rooms,
         slots=slots,
         session_requests=session_requests,
+    )
+
+
+def clone_problem_data(problem: ProblemData) -> ProblemData:
+    return ProblemData(
+        courses={key: replace(value) for key, value in problem.courses.items()},
+        lecturers={key: replace(value) for key, value in problem.lecturers.items()},
+        rooms={key: replace(value) for key, value in problem.rooms.items()},
+        slots={key: replace(value) for key, value in problem.slots.items()},
+        session_requests=list(problem.session_requests),
     )
 
 
