@@ -40,27 +40,6 @@
       <div class="bar"><span style="width: {{ result.activity_log[-1].progress }}%"></span></div>
     </div>
   </article>
-
-  <article class="panel">
-    <div class="panel-head">
-      <div>
-        <h2>Agent Activity</h2>
-        <p>Live-style timeline of the collaborating agents.</p>
-      </div>
-      <span class="text-chip">{{ result.strategy|title }}</span>
-    </div>
-    <div class="activity-list">
-      {% for event in result.activity_log %}
-      <div class="activity-item">
-        <span class="activity-progress">{{ event.progress }}%</span>
-        <div>
-          <strong>{{ event.agent }}</strong>
-          <p>{{ event.action }}: {{ event.detail }}</p>
-        </div>
-      </div>
-      {% endfor %}
-    </div>
-  </article>
 </section>
 
 <section class="content-grid">
@@ -106,7 +85,9 @@
       <div><span>Geographic Penalty</span><strong>{{ result.final_evaluation.metrics.geographic_penalty_index }}%</strong></div>
     </div>
   </article>
+</section>
 
+<section class="content-grid">
   <article class="panel">
     <div class="panel-head">
       <div>
@@ -125,6 +106,29 @@
       </li>
       {% endfor %}
     </ul>
+  </article>
+</section>
+
+<section class="content-grid">
+  <article class="panel">
+    <div class="panel-head">
+      <div>
+        <h2>Agent Activity</h2>
+        <p>Live-style timeline of the collaborating agents.</p>
+      </div>
+      <span class="text-chip">{{ result.strategy|title }}</span>
+    </div>
+    <div class="activity-list">
+      {% for event in result.activity_log %}
+      <div class="activity-item">
+        <span class="activity-progress">{{ event.progress }}%</span>
+        <div>
+          <strong>{{ event.agent }}</strong>
+          <p>{{ event.action }}: {{ event.detail }}</p>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
   </article>
 </section>
 {% else %}
