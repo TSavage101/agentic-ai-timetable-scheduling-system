@@ -30,12 +30,14 @@
 
 html {
   scroll-behavior: smooth;
+  overflow-x: hidden;
 }
 
 body {
   margin: 0;
   color: var(--ink);
   font-family: "Inter", "Segoe UI", sans-serif;
+  overflow-x: hidden;
   background:
     radial-gradient(circle at top right, rgba(139, 92, 246, 0.18), transparent 22%),
     radial-gradient(circle at top left, rgba(34, 211, 238, 0.14), transparent 24%),
@@ -51,6 +53,8 @@ a {
   min-height: 100vh;
   display: grid;
   grid-template-columns: 96px minmax(0, 1fr);
+  max-width: 100%;
+  overflow-x: clip;
 }
 
 .sidebar {
@@ -66,6 +70,8 @@ a {
   backdrop-filter: blur(24px);
   transition: transform 220ms ease;
   z-index: 20;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .brand-block {
@@ -189,6 +195,8 @@ label span {
 .shell-main {
   padding: 28px 32px 40px;
   min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 .topbar {
@@ -276,6 +284,7 @@ h3 {
 .page-content {
   width: 100%;
   min-width: 0;
+  overflow-x: hidden;
 }
 
 .stats-grid {
@@ -299,6 +308,7 @@ h3 {
 .panel,
 .stat-card {
   padding: 22px;
+  min-width: 0;
   transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
 }
 
@@ -357,6 +367,7 @@ h3 {
 .compare-card,
 .resource-card {
   padding: 14px;
+  min-width: 0;
   border-radius: var(--radius-md);
   border: 1px solid rgba(125, 211, 252, 0.1);
   background: rgba(255, 255, 255, 0.025);
@@ -386,6 +397,7 @@ h3 {
 .stack-list li {
   list-style: none;
   padding: 14px;
+  min-width: 0;
   border-radius: var(--radius-md);
   border: 1px solid rgba(125, 211, 252, 0.1);
   background: rgba(255, 255, 255, 0.03);
@@ -531,6 +543,7 @@ td {
   gap: 12px;
   max-height: 340px;
   overflow: auto;
+  min-width: 0;
   padding-right: 4px;
   margin-bottom: 16px;
 }
@@ -909,6 +922,17 @@ button:active,
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
+.resource-card,
+.stack-list li,
+.activity-item,
+.terminal p,
+td,
+th,
+.muted-inline {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 .history-rail {
   display: flex;
   gap: 10px;
@@ -1149,5 +1173,11 @@ button:active,
 
   .menu-toggle {
     display: inline-flex;
+  }
+}
+
+@media (max-height: 860px) {
+  .sidebar-card {
+    display: none;
   }
 }
