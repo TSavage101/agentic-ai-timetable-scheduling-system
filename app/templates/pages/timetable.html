@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 {% block content %}
 {% if result %}
-<section class="content-grid">
-  <article class="panel">
+<section class="command-center-layout">
+  <article class="panel matrix-panel">
     <div class="panel-head">
       <div>
         <h2>Interactive Timetable Grid</h2>
@@ -38,6 +38,15 @@
                 <strong>{{ card.course_code }}</strong>
                 <span>{{ card.room }}</span>
                 <span>{{ card.lecturer }}</span>
+                <div class="session-tooltip">
+                  <strong>Placement logic</strong>
+                  <ul>
+                    <li>Lecturer availability validated</li>
+                    <li>Room fit and capacity checked</li>
+                    <li>Slot conflict scan completed</li>
+                    <li>Quality score preserved for this move</li>
+                  </ul>
+                </div>
                 {% if card.violations %}
                 <em>{{ card.violations[0] }}</em>
                 {% endif %}
@@ -56,19 +65,28 @@
       <input type="hidden" name="target_slot_id" id="drag-slot-id" />
     </form>
   </article>
-</section>
 
-<section class="content-grid">
-  <article class="panel">
+  <aside class="panel dark-panel terminal-panel">
     <div class="panel-head">
       <div>
-        <h2>Resolution Drawer</h2>
-        <p>Recommended alternatives when a conflict or quality warning exists.</p>
+        <h2>Agent Terminal</h2>
+        <p>Conflict analysis, repair reasoning, and admin-safe recommendations.</p>
       </div>
     </div>
-    <ul class="stack-list">
+    <div class="terminal-feed">
+      {% for event in result.activity_log %}
+      <div class="activity-item terminal-entry">
+        <span class="activity-progress">{{ event.progress }}%</span>
+        <div>
+          <strong>{{ event.agent }}</strong>
+          <p><span class="log-prefix">&gt; {{ event.action|upper }}</span> {{ event.detail }}</p>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    <ul class="stack-list terminal-stack">
       {% for suggestion in result.resolution_suggestions %}
-      <li>
+      <li class="suggestion-card">
         <strong>{{ suggestion.session_id }}</strong>
         <p>{{ suggestion.message }}</p>
         {% if suggestion.alternatives %}
@@ -77,7 +95,7 @@
       </li>
       {% endfor %}
     </ul>
-  </article>
+</aside>
 </section>
 
 <section class="content-grid">

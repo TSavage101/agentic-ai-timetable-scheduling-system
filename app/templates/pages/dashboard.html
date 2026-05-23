@@ -110,21 +110,21 @@
 </section>
 
 <section class="content-grid">
-  <article class="panel">
+  <article class="panel dark-panel terminal-panel">
     <div class="panel-head">
       <div>
-        <h2>Agent Activity</h2>
-        <p>Live-style timeline of the collaborating agents.</p>
+        <h2>Agent Terminal</h2>
+        <p>Real-time reasoning stream from the orchestration pipeline.</p>
       </div>
       <span class="text-chip">{{ result.strategy|title }}</span>
     </div>
-    <div class="activity-list">
+    <div class="terminal-feed">
       {% for event in result.activity_log %}
-      <div class="activity-item">
+      <div class="activity-item terminal-entry">
         <span class="activity-progress">{{ event.progress }}%</span>
         <div>
           <strong>{{ event.agent }}</strong>
-          <p>{{ event.action }}: {{ event.detail }}</p>
+          <p><span class="log-prefix">&gt; {{ event.action|upper }}</span> {{ event.detail }}</p>
         </div>
       </div>
       {% endfor %}

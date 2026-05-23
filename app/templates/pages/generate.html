@@ -38,11 +38,41 @@
       <div class="form-section">
         <h3>Hard Constraints</h3>
         <div class="toggle-grid">
-          <label class="toggle-row"><input type="checkbox" name="lecturer_double_booking" {% if constraint_defaults.lecturer_double_booking %}checked{% endif %} /><span>Prevent lecturer double-booking</span></label>
-          <label class="toggle-row"><input type="checkbox" name="room_exclusivity" {% if constraint_defaults.room_exclusivity %}checked{% endif %} /><span>Respect room exclusivity</span></label>
-          <label class="toggle-row"><input type="checkbox" name="room_capacity_enforced" {% if constraint_defaults.room_capacity_enforced %}checked{% endif %} /><span>Enforce room capacity</span></label>
-          <label class="toggle-row"><input type="checkbox" name="room_type_enforced" {% if constraint_defaults.room_type_enforced %}checked{% endif %} /><span>Enforce room type</span></label>
-          <label class="toggle-row"><input type="checkbox" name="fatigue_limit_enabled" {% if constraint_defaults.fatigue_limit_enabled %}checked{% endif %} /><span>Enable fatigue protection</span></label>
+          <label class="toggle-row">
+            <span>Prevent lecturer double-booking</span>
+            <span class="toggle-switch">
+              <input type="checkbox" name="lecturer_double_booking" {% if constraint_defaults.lecturer_double_booking %}checked{% endif %} />
+              <span class="toggle-slider"></span>
+            </span>
+          </label>
+          <label class="toggle-row">
+            <span>Respect room exclusivity</span>
+            <span class="toggle-switch">
+              <input type="checkbox" name="room_exclusivity" {% if constraint_defaults.room_exclusivity %}checked{% endif %} />
+              <span class="toggle-slider"></span>
+            </span>
+          </label>
+          <label class="toggle-row">
+            <span>Enforce room capacity</span>
+            <span class="toggle-switch">
+              <input type="checkbox" name="room_capacity_enforced" {% if constraint_defaults.room_capacity_enforced %}checked{% endif %} />
+              <span class="toggle-slider"></span>
+            </span>
+          </label>
+          <label class="toggle-row">
+            <span>Enforce room type</span>
+            <span class="toggle-switch">
+              <input type="checkbox" name="room_type_enforced" {% if constraint_defaults.room_type_enforced %}checked{% endif %} />
+              <span class="toggle-slider"></span>
+            </span>
+          </label>
+          <label class="toggle-row">
+            <span>Enable fatigue protection</span>
+            <span class="toggle-switch">
+              <input type="checkbox" name="fatigue_limit_enabled" {% if constraint_defaults.fatigue_limit_enabled %}checked{% endif %} />
+              <span class="toggle-slider"></span>
+            </span>
+          </label>
         </div>
         <label><span>Maximum Consecutive Sessions</span><input type="number" name="max_consecutive_sessions" min="1" max="6" value="{{ constraint_defaults.max_consecutive_sessions }}" /></label>
       </div>
@@ -192,7 +222,7 @@
       </div>
 
       <div class="submit-row">
-        <button type="submit">Generate Timetable</button>
+        <button type="submit" class="run-ai-button">Run AI Scheduler</button>
       </div>
     </form>
   </article>
