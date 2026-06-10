@@ -1,4 +1,10 @@
+from io import BytesIO
+from pathlib import Path
+
+from fastapi.testclient import TestClient
+
 from app.agents import ConstraintAgent, OrchestratorAgent, PolicyModel
+from app.main import JOB_CACHE, app
 from app.io_utils import load_problem_data
 from app.models import ConstraintConfig, SoftConstraintWeights
 
@@ -33,3 +39,39 @@ def test_genetic_strategy_runs_without_hard_violations():
     problem = load_problem_data()
     result = OrchestratorAgent().run(problem, strategy="genetic", training_episodes=3, generations=4)
     assert len(result["final_evaluation"].hard_violations) == 0
+
+
+def test_large_dataset_switches_to_adaptive_mode_and_preserves_hard_constraints():
+    courses_bytes = Path(r"C:\Users\HP\Downloads\Telegram Desktop\courses(6).csv").read_bytes()
+    lecturers_bytes = Path(r"C:\Users\HP\Downloads\Telegram Desktop\lecturers(5).csv").read_bytes()
+    rooms_bytes = Path(r"C:\Users\HP\Downloads\Telegram Desktop\rooms(5).csv").read_bytes()
+    slots_bytes = Path(r"C:\Users\HP\Downloads\Telegram Desktop\timeslots(5).csv").read_bytes()
+    problem = load_problem_data(
+        type("Upload", (), {"filename": "courses.csv", "file": BytesIO(courses_bytes)})(),
+        type("Upload", (), {"filename": "lecturers.csv", "file": BytesIO(lecturers_bytes)})(),
+        type("Upload", (), {"filename": "rooms.csv", "file": BytesIO(rooms_bytes)})(),
+        type("Upload", (), {"filename": "timeslots.csv", "file": BytesIO(slots_bytes)})(),
+    )
+    result = OrchestratorAgent().run(problem, strategy="hybrid", training_episodes=0, generations=4)
+    assert result["adaptive_summary"]["very_large_problem"] is True
+    assert result["adaptive_summary"]["effective_strategy"] == "heuristic"
+    assert len(result["final_evaluation"].hard_violations) == 0
+
+
+def test_generate_endpoint_returns_quickly_and_creates_background_job():
+    client = TestClient(app)
+    courses_bytes = Path(r"C:\Users\HP\Downloads\Telegram Desktop\courses(6).csv").read_bytes()
+    lecturers_bytes = Path(r"C:\Users\HP\Downloads\Telegram Desktop\lecturers(5).csv").read_bytes()
+    rooms_bytes = Path(r"C:\Users\HP\Downloads\Telegram Desktop\rooms(5).csv").read_bytes()
+    slots_bytes = Path(r"C:\Users\HP\Downloads\Telegram Desktop\timeslots(5).csv").read_bytes()
+    files = {
+        "courses": ("courses.csv", BytesIO(courses_bytes), "text/csv"),
+        "lecturers": ("lecturers.csv", BytesIO(lecturers_bytes), "text/csv"),
+        "rooms": ("rooms.csv", BytesIO(rooms_bytes), "text/csv"),
+        "timeslots": ("timeslots.csv", BytesIO(slots_bytes), "text/csv"),
+    }
+    response = client.post("/generate", files=files, data={"strategy": "hybrid", "training_episodes": "0", "generations": "4"})
+    assert response.status_code == 200
+    assert "Generation Job" in response.text
+    latest_job = JOB_CACHE[next(reversed(JOB_CACHE))]
+    assert latest_job["status"] in {"queued", "running", "completed"}

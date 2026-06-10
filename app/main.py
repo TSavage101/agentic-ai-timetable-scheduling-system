@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import threading
 import io
+import traceback
 import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -22,6 +24,7 @@ templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 orchestrator = OrchestratorAgent()
 EXPORT_CACHE: Dict[str, object] = {}
 RUN_CACHE: Dict[str, Dict[str, Any]] = {}
+JOB_CACHE: Dict[str, Dict[str, Any]] = {}
 
 
 NAV_ITEMS = [
@@ -93,6 +96,7 @@ def _base_context(request: Request, active_page: str, run_id: Optional[str] = No
         "slot_options": slot_options,
         "room_options": room_options,
         "message": message,
+        "job_status": None,
         "preference_rows": [{"lecturer_id": "", "request_text": "", "slot": "", "day": ""}],
         "disruption_rows": [{"disruption_type": "", "target_id": "", "slot_id": "", "note": ""}],
     }
@@ -266,6 +270,8 @@ def _run_context(request: Request, active_page: str, run_id: Optional[str], mess
         weights=run["weights"],
         training_summary=run["training_summary"],
         optimization_summary=run["optimization_summary"],
+        adaptive_summary=run.get("adaptive_summary"),
+        policy_weights_override=run.get("policy_weights"),
         guidelines=run["guidelines"],
         lecturer_preferences=run["lecturer_preferences"],
         natural_language_request=run["natural_language_request"],
@@ -295,15 +301,125 @@ def _run_context(request: Request, active_page: str, run_id: Optional[str], mess
         "slot_options": list(run["problem"].slots.values()),
         "room_options": list(run["problem"].rooms.values()),
         "message": message,
+        "job_status": None,
         "preference_rows": run["preference_rows"] or [{"lecturer_id": "", "request_text": "", "slot": "", "day": ""}],
         "disruption_rows": run["disruption_rows"] or [{"disruption_type": "", "target_id": "", "slot_id": "", "note": ""}],
     }
 
 
-def _render(request: Request, page: str, run_id: Optional[str] = None, message: str = "") -> HTMLResponse:
+def _job_context(request: Request, active_page: str, job_id: Optional[str], run_id: Optional[str], message: str = "") -> Dict[str, Any]:
+    context = _run_context(request, active_page, run_id, message)
+    if job_id and job_id in JOB_CACHE:
+        context["job_status"] = JOB_CACHE[job_id]
+    return context
+
+
+def _render(request: Request, page: str, run_id: Optional[str] = None, message: str = "", job_id: Optional[str] = None) -> HTMLResponse:
     active_run = run_id or _latest_run_id()
-    context = _run_context(request, page, active_run, message)
+    context = _job_context(request, page, job_id, active_run, message)
     return templates.TemplateResponse(request, f"pages/{page}.html", context)
+
+
+def _store_run(
+    *,
+    problem: ProblemData,
+    result: Dict[str, Any],
+    strategy: str,
+    training_episodes: int,
+    generations: int,
+    config: ConstraintConfig,
+    weights: SoftConstraintWeights,
+    departmental_guidelines: str,
+    preference_rows: List[Dict[str, str]],
+    nl_request: str,
+    disruption_rows: List[Dict[str, str]],
+) -> str:
+    run_id = str(uuid.uuid4())
+    RUN_CACHE[run_id] = {
+        "problem": problem,
+        "base_problem": problem,
+        "assignments": _coerce_assignments(result["assignments"]),
+        "draft_assignments": _coerce_assignments(result["draft_assignments"]),
+        "strategy": strategy,
+        "training_episodes": training_episodes,
+        "generations": generations,
+        "config": config,
+        "weights": weights,
+        "training_summary": result["training_summary"],
+        "optimization_summary": result["optimization_summary"],
+        "adaptive_summary": result.get("adaptive_summary"),
+        "policy_weights": result.get("policy_weights"),
+        "guidelines": departmental_guidelines,
+        "lecturer_preferences": preference_rows,
+        "natural_language_request": nl_request,
+        "disruptions": disruption_rows,
+        "approved": False,
+        "feedback_log": [],
+        "preference_rows": preference_rows,
+        "disruption_rows": disruption_rows,
+        "result": result,
+    }
+    return run_id
+
+
+def _run_generation_job(
+    *,
+    job_id: str,
+    problem: ProblemData,
+    strategy: str,
+    training_episodes: int,
+    generations: int,
+    config: ConstraintConfig,
+    weights: SoftConstraintWeights,
+    departmental_guidelines: str,
+    preference_rows: List[Dict[str, str]],
+    nl_request: str,
+    disruption_rows: List[Dict[str, str]],
+) -> None:
+    JOB_CACHE[job_id]["status"] = "running"
+    JOB_CACHE[job_id]["message"] = "The scheduling agents are processing the uploaded dataset."
+    try:
+        job_orchestrator = OrchestratorAgent()
+        result = job_orchestrator.run(
+            problem=problem,
+            strategy=strategy,
+            training_episodes=max(0, training_episodes),
+            generations=max(1, generations),
+            config=config,
+            weights=weights,
+            guidelines=departmental_guidelines,
+            lecturer_preferences=preference_rows,
+            natural_language_request=nl_request,
+            disruptions=disruption_rows,
+        )
+        run_id = _store_run(
+            problem=problem,
+            result=result,
+            strategy=strategy,
+            training_episodes=max(0, training_episodes),
+            generations=max(1, generations),
+            config=config,
+            weights=weights,
+            departmental_guidelines=departmental_guidelines,
+            preference_rows=preference_rows,
+            nl_request=nl_request,
+            disruption_rows=disruption_rows,
+        )
+        JOB_CACHE[job_id].update(
+            {
+                "status": "completed",
+                "message": "Schedule generation finished successfully.",
+                "run_id": run_id,
+            }
+        )
+    except Exception as exc:
+        JOB_CACHE[job_id].update(
+            {
+                "status": "failed",
+                "message": str(exc),
+                "error_trace": traceback.format_exc(limit=8),
+            }
+        )
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -317,8 +433,22 @@ async def dashboard(request: Request, run_id: str | None = Query(default=None)) 
 
 
 @app.get("/generate", response_class=HTMLResponse)
-async def generate_page(request: Request, run_id: str | None = Query(default=None)) -> HTMLResponse:
-    return _render(request, "generate", run_id)
+async def generate_page(
+    request: Request,
+    run_id: str | None = Query(default=None),
+    job_id: str | None = Query(default=None),
+) -> HTMLResponse:
+    message = ""
+    if job_id and job_id in JOB_CACHE:
+        status = JOB_CACHE[job_id]["status"]
+        if status == "completed":
+            run_id = JOB_CACHE[job_id].get("run_id")
+            message = "Schedule job completed. The latest run is ready for review."
+        elif status == "failed":
+            message = f"Schedule job failed: {JOB_CACHE[job_id].get('message', 'Unknown error')}"
+        else:
+            message = "Schedule generation is still running in the background. This page will update safely without blocking the whole app."
+    return _render(request, "generate", run_id, message, job_id=job_id)
 
 
 @app.get("/timetable", response_class=HTMLResponse)
@@ -349,6 +479,11 @@ async def audit_page(request: Request, run_id: str | None = Query(default=None))
 @app.get("/settings", response_class=HTMLResponse)
 async def settings_page(request: Request, run_id: str | None = Query(default=None)) -> HTMLResponse:
     return _render(request, "settings", run_id)
+
+
+@app.get("/healthz")
+async def healthz() -> Dict[str, str]:
+    return {"status": "ok"}
 
 
 @app.post("/generate", response_class=HTMLResponse)
@@ -416,43 +551,38 @@ async def generate_schedule(
     working_problem = _apply_preference_rows(working_problem, preference_rows)
     working_problem = _apply_disruptions(working_problem, disruption_rows)
 
-    result = orchestrator.run(
-        problem=working_problem,
-        strategy=strategy,
-        training_episodes=max(0, training_episodes),
-        generations=max(1, generations),
-        config=config,
-        weights=weights,
-        guidelines=departmental_guidelines,
-        lecturer_preferences=preference_rows,
-        natural_language_request=nl_request,
-        disruptions=disruption_rows,
-    )
-
-    run_id = str(uuid.uuid4())
-    RUN_CACHE[run_id] = {
-        "problem": working_problem,
-        "base_problem": base_problem,
-        "assignments": _coerce_assignments(result["assignments"]),
-        "draft_assignments": _coerce_assignments(result["draft_assignments"]),
+    job_id = str(uuid.uuid4())
+    JOB_CACHE[job_id] = {
+        "job_id": job_id,
+        "status": "queued",
+        "message": "The uploaded dataset is queued for generation.",
         "strategy": strategy,
-        "training_episodes": max(0, training_episodes),
-        "generations": max(1, generations),
-        "config": config,
-        "weights": weights,
-        "training_summary": result["training_summary"],
-        "optimization_summary": result["optimization_summary"],
-        "guidelines": departmental_guidelines,
-        "lecturer_preferences": preference_rows,
-        "natural_language_request": nl_request,
-        "disruptions": disruption_rows,
-        "approved": False,
-        "feedback_log": [],
-        "preference_rows": preference_rows,
-        "disruption_rows": disruption_rows,
-        "result": result,
     }
-    return _render(request, "dashboard", run_id, "Fresh schedule generated. The dashboard now reflects the latest run.")
+    worker = threading.Thread(
+        target=_run_generation_job,
+        kwargs={
+            "job_id": job_id,
+            "problem": working_problem,
+            "strategy": strategy,
+            "training_episodes": max(0, training_episodes),
+            "generations": max(1, generations),
+            "config": config,
+            "weights": weights,
+            "departmental_guidelines": departmental_guidelines,
+            "preference_rows": preference_rows,
+            "nl_request": nl_request,
+            "disruption_rows": disruption_rows,
+        },
+        daemon=True,
+    )
+    worker.start()
+    return _render(
+        request,
+        "generate",
+        None,
+        "Generation started in the background. You can stay on the app while the scheduler works.",
+        job_id=job_id,
+    )
 
 
 @app.post("/adjust", response_class=HTMLResponse)

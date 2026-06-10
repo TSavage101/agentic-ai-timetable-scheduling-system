@@ -14,12 +14,13 @@
       <div class="resource-card">
         <strong>{{ room.name }}</strong>
         <span>{{ room.capacity }} seats</span>
-        <span>{{ room.room_type }} · {{ room.location }}</span>
+        <span>{{ room.room_type }} &middot; {{ room.location }}</span>
         <span>{{ room.equipment|join(', ') if room.equipment else 'Standard equipment' }}</span>
       </div>
       {% endfor %}
     </div>
   </article>
+
   <article class="panel">
     <div class="panel-head">
       <div>
@@ -33,7 +34,7 @@
         <li>
           <strong>{{ pref.lecturer_id or 'Unassigned Lecturer' }}</strong>
           <p>{{ pref.request_text or 'No free-text request provided.' }}</p>
-          <span class="muted-inline">Slot: {{ pref.slot or 'Any' }} · Day: {{ pref.day or 'Any' }}</span>
+          <span class="muted-inline">Slot: {{ pref.slot or 'Any' }} &middot; Day: {{ pref.day or 'Any' }}</span>
         </li>
         {% endfor %}
       {% else %}
@@ -41,6 +42,7 @@
       {% endif %}
     </ul>
   </article>
+
   <article class="panel">
     <div class="panel-head">
       <div>

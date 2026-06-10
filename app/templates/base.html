@@ -6,50 +6,75 @@
   <title>Agentic AI Timetable Scheduling System</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
+  <div class="mosaic-background" aria-hidden="true"></div>
   <div class="app-shell">
-    <aside class="sidebar" id="sidebar">
-      <div class="brand-block">
-        <span class="brand-mark">AT</span>
+    <header class="shell-header">
+      <div class="shell-header__left">
+        <a href="/dashboard{% if run_id %}?run_id={{ run_id }}{% endif %}" class="brand-mark">AT</a>
         <div>
-          <strong>Agentic Timetable</strong>
-          <p>Operations Console</p>
+          <strong>Agentic Timetable System</strong>
+          <p class="mono-text">PRODUCTION CONSOLE</p>
         </div>
       </div>
-      <nav class="nav-list">
+      <button class="menu-toggle" type="button" id="menu-toggle">Menu</button>
+      <nav class="nav-list" id="top-nav">
         {% for item in nav_items %}
         <a href="{{ item.href }}" class="nav-link {% if active_page == item.key %}active{% endif %}">
-          <span class="nav-icon">{{ item.label[:1] }}</span>
+          <span class="nav-index">{{ "%02d" % loop.index }}.</span>
           <span>{{ item.label }}</span>
         </a>
         {% endfor %}
       </nav>
-      <div class="sidebar-card">
-        <h3>Design Direction</h3>
-        <p>Multi-page admin workflow, focused forms, subtle motion, and responsive scheduling views.</p>
+      <div class="shell-header__actions">
+        <a href="/resources{% if run_id %}?run_id={{ run_id }}{% endif %}" class="ghost-button top-action">RESOURCES</a>
+        <a href="/generate{% if run_id %}?run_id={{ run_id }}{% endif %}" class="primary-link top-action">RUN AI</a>
       </div>
-    </aside>
+    </header>
 
     <div class="shell-main">
-      <header class="topbar">
-        <button class="menu-toggle" type="button" id="menu-toggle">Menu</button>
-        <div>
-          <p class="eyebrow">University Scheduling Platform</p>
-          <h1>{{ page_title }}</h1>
-          <p class="page-subtitle">{{ page_subtitle }}</p>
-        </div>
-        <div class="topbar-meta">
-          <span class="status-pill {% if result and result.approved %}success{% elif result %}active{% else %}idle{% endif %}">
-            {% if result and result.approved %}Approved{% elif result %}Live Run{% else %}No Active Run{% endif %}
+      <section class="page-hero">
+        <div class="page-hero__copy">
+          <span class="status-badge">
+            <span class="status-dot"></span>
+            {% if result and result.approved %}SYSTEM APPROVED{% elif result %}SYSTEM ACTIVE{% else %}READY FOR INPUT{% endif %}
           </span>
-          {% if run_id %}
-          <span class="run-badge">Run {{ run_id[:8] }}</span>
-          {% endif %}
+          <h1>{{ page_title }}</h1>
+          <p class="hero-subtitle">{{ page_subtitle }}</p>
+          <div class="hero-meta">
+            {% if run_id %}
+            <span class="run-badge">RUN {{ run_id[:8] }}</span>
+            {% endif %}
+            {% if result and result.adaptive_summary %}
+            <span class="run-badge">MODE {{ result.adaptive_summary.effective_strategy|upper }}</span>
+            {% endif %}
+          </div>
         </div>
-      </header>
+        <div class="page-hero__graphic">
+          <div class="topology-graph">
+            <svg viewBox="0 0 460 460" aria-hidden="true">
+              <circle cx="230" cy="230" r="140" class="orbit-path" />
+              <line x1="230" y1="230" x2="230" y2="90" class="graph-line" />
+              <line x1="230" y1="230" x2="348" y2="300" class="graph-line" />
+              <line x1="230" y1="230" x2="112" y2="300" class="graph-line" />
+              <g class="orbit-group orbit-group--one">
+                <circle cx="230" cy="90" r="14" class="node orbit-node" />
+              </g>
+              <g class="orbit-group orbit-group--two">
+                <circle cx="351" cy="299" r="12" class="node orbit-node accent-node" />
+              </g>
+              <g class="orbit-group orbit-group--three">
+                <circle cx="109" cy="299" r="12" class="node orbit-node warning-node" />
+              </g>
+              <circle cx="230" cy="230" r="18" class="node center-node" />
+            </svg>
+          </div>
+        </div>
+      </section>
 
       {% if message %}
       <div class="message-banner fade-in">{{ message }}</div>
@@ -79,9 +104,9 @@
 
   <script>
     const menuToggle = document.getElementById('menu-toggle');
-    const sidebar = document.getElementById('sidebar');
-    if (menuToggle && sidebar) {
-      menuToggle.addEventListener('click', () => sidebar.classList.toggle('open'));
+    const topNav = document.getElementById('top-nav');
+    if (menuToggle && topNav) {
+      menuToggle.addEventListener('click', () => topNav.classList.toggle('open'));
     }
 
     document.querySelectorAll('form[data-loading="true"]').forEach((form) => {

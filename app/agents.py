@@ -430,6 +430,7 @@ class SchedulingAgent:
         assignments: List[Assignment] = []
         room_usage: Dict[Tuple[str, str], bool] = {}
         lecturer_usage: Dict[Tuple[str, str], bool] = {}
+        cohort_slot_usage: Dict[Tuple[str, str], bool] = {}
         cohort_day_usage: Dict[str, set[str]] = defaultdict(set)
 
         ordered_requests = sorted(
@@ -462,6 +463,8 @@ class SchedulingAgent:
                     if config.room_exclusivity and room_usage.get((slot.id, room.id)):
                         continue
                     if config.lecturer_double_booking and lecturer_usage.get((slot.id, course.lecturer_id)):
+                        continue
+                    if cohort_key and cohort_slot_usage.get((slot.id, cohort_key)):
                         continue
 
                     preferred = bool(course.preferred_slots and slot.id in course.preferred_slots)
@@ -509,6 +512,8 @@ class SchedulingAgent:
                 assignment.room_id = room_id
                 room_usage[(slot_id, room_id)] = True
                 lecturer_usage[(slot_id, course.lecturer_id)] = True
+                if cohort_key:
+                    cohort_slot_usage[(slot_id, cohort_key)] = True
                 cohort_day_usage[cohort_key].add(problem.slots[slot_id].day)
 
             assignments.append(assignment)
@@ -698,34 +703,39 @@ class OrchestratorAgent:
     ) -> Dict[str, object]:
         config = config or ConstraintConfig()
         weights = weights or SoftConstraintWeights()
+        adaptive_summary = self._adaptive_summary(problem, strategy, generations, training_episodes)
         training_summary = None
-        if training_episodes > 0:
-            training_summary = self.policy_model.train(problem, episodes=training_episodes)
+        effective_training_episodes = adaptive_summary["effective_training_episodes"]
+        if effective_training_episodes > 0:
+            training_summary = self.policy_model.train(problem, episodes=effective_training_episodes)
 
         policy = self.policy_model if strategy in {"policy", "hybrid", "genetic"} else None
         draft = self.scheduling_agent.generate_initial_schedule(problem, config, weights, policy_model=policy)
-        draft_evaluation = self.constraint_agent.evaluate(problem, draft, config, weights)
 
         optimization_summary = None
-        if strategy == "heuristic":
-            final_schedule = self.conflict_agent.improve_schedule(problem, draft, config, weights, max_rounds=90)
-        elif strategy == "policy":
-            final_schedule = self.conflict_agent.improve_schedule(problem, draft, config, weights, max_rounds=120)
-        elif strategy == "genetic":
-            final_schedule, optimization_summary = self.genetic_agent.optimize(problem, config, weights, policy_model=policy, generations=generations)
-        else:
-            repaired = self.conflict_agent.improve_schedule(problem, draft, config, weights, max_rounds=80)
+        effective_strategy = adaptive_summary["effective_strategy"]
+        if effective_strategy == "heuristic":
+            final_schedule = draft
+        elif effective_strategy == "policy":
+            final_schedule = draft
+        elif effective_strategy == "genetic":
             final_schedule, optimization_summary = self.genetic_agent.optimize(
                 problem,
                 config,
                 weights,
                 policy_model=policy,
-                generations=max(4, generations // 2),
+                population_size=adaptive_summary["population_size"],
+                generations=adaptive_summary["effective_generations"],
             )
-            repaired_eval = self.constraint_agent.evaluate(problem, repaired, config, weights)
-            genetic_eval = self.constraint_agent.evaluate(problem, final_schedule, config, weights)
-            if self.conflict_agent._ranking_key(repaired_eval) > self.conflict_agent._ranking_key(genetic_eval):
-                final_schedule = repaired
+        else:
+            final_schedule, optimization_summary = self.genetic_agent.optimize(
+                problem,
+                config,
+                weights,
+                policy_model=policy,
+                population_size=adaptive_summary["population_size"],
+                generations=adaptive_summary["effective_generations"],
+            )
 
         return self.summarize(
             problem=problem,
@@ -736,6 +746,7 @@ class OrchestratorAgent:
             weights=weights,
             training_summary=training_summary,
             optimization_summary=optimization_summary,
+            adaptive_summary=adaptive_summary,
             guidelines=guidelines,
             lecturer_preferences=lecturer_preferences or [],
             natural_language_request=natural_language_request,
@@ -752,6 +763,8 @@ class OrchestratorAgent:
         weights: Optional[SoftConstraintWeights] = None,
         training_summary: Optional[Dict[str, object]] = None,
         optimization_summary: Optional[Dict[str, object]] = None,
+        adaptive_summary: Optional[Dict[str, object]] = None,
+        policy_weights_override: Optional[Dict[str, float]] = None,
         guidelines: str = "",
         lecturer_preferences: Optional[List[Dict[str, str]]] = None,
         natural_language_request: str = "",
@@ -795,7 +808,8 @@ class OrchestratorAgent:
             "grid": grid,
             "training_summary": training_summary,
             "optimization_summary": optimization_summary,
-            "policy_weights": {key: round(value, 4) for key, value in self.policy_model.weights.items()},
+            "adaptive_summary": adaptive_summary or {},
+            "policy_weights": {key: round(value, 4) for key, value in (policy_weights_override or self.policy_model.weights).items()},
             "activity_log": activity,
             "audit_log": audit_log,
             "argument_terminal": argument_terminal,
@@ -810,6 +824,56 @@ class OrchestratorAgent:
             "disruptions": disruptions or [],
             "approved": approved,
             "feedback_log": feedback_log or [],
+        }
+
+    def _adaptive_summary(
+        self,
+        problem: ProblemData,
+        strategy: str,
+        generations: int,
+        training_episodes: int,
+    ) -> Dict[str, object]:
+        session_count = len(problem.session_requests)
+        room_count = len(problem.rooms)
+        slot_count = len(problem.slots)
+        search_space = session_count * max(1, room_count) * max(1, slot_count)
+        large_problem = session_count >= 120 or search_space >= 250_000
+        very_large_problem = session_count >= 220 or search_space >= 600_000
+
+        effective_strategy = strategy
+        if very_large_problem:
+            effective_strategy = "heuristic"
+        elif large_problem and strategy == "hybrid":
+            effective_strategy = "policy"
+        elif large_problem and strategy == "genetic":
+            effective_strategy = "policy"
+
+        if very_large_problem:
+            note = (
+                "Scalable production mode activated. The system kept hard constraints and fast heuristic placement "
+                "while skipping expensive repair loops to avoid request timeouts."
+            )
+        elif large_problem:
+            note = (
+                "Adaptive large-dataset mode activated. Heavy optimization was reduced so the schedule can finish "
+                "within production time limits."
+            )
+        else:
+            note = "Standard optimization profile used."
+
+        return {
+            "session_count": session_count,
+            "room_count": room_count,
+            "slot_count": slot_count,
+            "search_space": search_space,
+            "large_problem": large_problem,
+            "very_large_problem": very_large_problem,
+            "requested_strategy": strategy,
+            "effective_strategy": effective_strategy,
+            "effective_generations": 2 if large_problem else max(2, generations),
+            "effective_training_episodes": 0 if large_problem else max(0, training_episodes),
+            "population_size": 3 if large_problem else 8,
+            "note": note,
         }
 
     def suggest_adjustment(

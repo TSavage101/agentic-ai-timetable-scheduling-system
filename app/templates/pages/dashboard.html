@@ -43,6 +43,24 @@
 </section>
 
 <section class="content-grid">
+  {% if result.adaptive_summary %}
+  <article class="panel">
+    <div class="panel-head">
+      <div>
+        <h2>Production Profile</h2>
+        <p>Dataset scale, selected mode, and the optimization profile used to keep production responsive.</p>
+      </div>
+    </div>
+    <div class="mini-metrics">
+      <div><span>Requested Strategy</span><strong>{{ result.adaptive_summary.requested_strategy|upper }}</strong></div>
+      <div><span>Effective Strategy</span><strong>{{ result.adaptive_summary.effective_strategy|upper }}</strong></div>
+      <div><span>Sessions</span><strong>{{ result.adaptive_summary.session_count }}</strong></div>
+      <div><span>Search Space</span><strong>{{ result.adaptive_summary.search_space }}</strong></div>
+    </div>
+    <p>{{ result.adaptive_summary.note }}</p>
+  </article>
+  {% endif %}
+
   <article class="panel">
     <div class="panel-head">
       <div>

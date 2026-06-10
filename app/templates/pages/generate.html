@@ -1,6 +1,28 @@
 {% extends "base.html" %}
 {% block content %}
 <section class="content-grid">
+  {% if job_status %}
+  <article class="panel">
+    <div class="panel-head">
+      <div>
+        <h2>Generation Job</h2>
+        <p>Background processing keeps the production site responsive while larger datasets are scheduled.</p>
+      </div>
+      <span class="status-pill {% if job_status.status == 'completed' %}success{% elif job_status.status == 'failed' %}idle{% else %}active{% endif %}">
+        {{ job_status.status|upper }}
+      </span>
+    </div>
+    <p>{{ job_status.message }}</p>
+    {% if job_status.status == "completed" and job_status.run_id %}
+    <a href="/dashboard?run_id={{ job_status.run_id }}" class="primary-link">Open Completed Run</a>
+    {% elif job_status.status == "failed" %}
+    <p class="muted-inline">Check the data shape or server logs, then retry with the same CSV files.</p>
+    {% else %}
+    <p class="muted-inline">Refresh this page in a few seconds. The scheduling job is still running.</p>
+    {% endif %}
+  </article>
+  {% endif %}
+
   <article class="panel wide-panel">
     <div class="panel-head">
       <div>
@@ -227,4 +249,11 @@
     </form>
   </article>
 </section>
+{% if job_status and job_status.status in ['queued', 'running'] %}
+<script>
+  setTimeout(() => {
+    window.location.href = "/generate?job_id={{ job_status.job_id }}";
+  }, 4000);
+</script>
+{% endif %}
 {% endblock %}
