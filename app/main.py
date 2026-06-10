@@ -546,10 +546,18 @@ async def generate_schedule(
         disruption_note,
     )
 
-    base_problem = load_problem_data(courses, lecturers, rooms, timeslots)
-    working_problem = _apply_natural_language(base_problem, nl_request)
-    working_problem = _apply_preference_rows(working_problem, preference_rows)
-    working_problem = _apply_disruptions(working_problem, disruption_rows)
+    try:
+        base_problem = load_problem_data(courses, lecturers, rooms, timeslots)
+        working_problem = _apply_natural_language(base_problem, nl_request)
+        working_problem = _apply_preference_rows(working_problem, preference_rows)
+        working_problem = _apply_disruptions(working_problem, disruption_rows)
+    except Exception as exc:
+        return _render(
+            request,
+            "generate",
+            None,
+            f"Could not process the uploaded CSV files: {exc}",
+        )
 
     job_id = str(uuid.uuid4())
     JOB_CACHE[job_id] = {
