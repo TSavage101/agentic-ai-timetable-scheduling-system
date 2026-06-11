@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import random
 from collections import defaultdict
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -17,11 +17,28 @@ from .models import (
     ResolutionSuggestion,
     SoftConstraintWeights,
     Violation,
+    ConflictReportEntry,
 )
 
 
 MODEL_DIR = Path(__file__).resolve().parent.parent / "data" / "models"
 MODEL_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def time_to_hours(time_str: str) -> float:
+    try:
+        parts = time_str.split(":")
+        return int(parts[0]) + int(parts[1]) / 60.0
+    except Exception:
+        return 0.0
+
+
+def get_session_interval(course: Course, slot: TimeSlot) -> Tuple[float, float]:
+    start = time_to_hours(slot.start)
+    end = time_to_hours(slot.end)
+    slot_dur = max(0.5, end - start)
+    dur = max(float(course.duration_hours), slot_dur)
+    return start, start + dur
 
 
 class ConstraintAgent:
@@ -38,9 +55,14 @@ class ConstraintAgent:
         slots = problem.slots
         hard: List[Violation] = []
         soft: List[Violation] = []
-        room_usage: Dict[Tuple[str, str], List[str]] = defaultdict(list)
-        lecturer_usage: Dict[Tuple[str, str], List[str]] = defaultdict(list)
-        cohort_usage: Dict[Tuple[str, str], List[str]] = defaultdict(list)
+
+        room_intervals = defaultdict(lambda: defaultdict(list))
+        lecturer_intervals = defaultdict(lambda: defaultdict(list))
+        group_intervals = defaultdict(lambda: defaultdict(list))
+
+        lecturer_daily_hours = defaultdict(lambda: defaultdict(float))
+        lecturer_weekly_hours = defaultdict(float)
+
         course_days: Dict[str, List[str]] = defaultdict(list)
         lecturer_day_slots: Dict[Tuple[str, str], List[str]] = defaultdict(list)
         cohort_day_slots: Dict[Tuple[str, str], List[str]] = defaultdict(list)
@@ -50,7 +72,8 @@ class ConstraintAgent:
         for assignment in assignments:
             course = courses[assignment.course_id]
             lecturer = lecturers[course.lecturer_id]
-            cohort_key = f"{course.department}-{course.level}".strip("-")
+            group_id = course.student_group
+            group_name = problem.student_groups[group_id].name if group_id in problem.student_groups else group_id
 
             if not assignment.slot_id or not assignment.room_id:
                 unscheduled_count += 1
@@ -68,12 +91,22 @@ class ConstraintAgent:
             slot = slots[assignment.slot_id]
             room = rooms[assignment.room_id]
 
-            room_usage[(assignment.slot_id, assignment.room_id)].append(assignment.session_id)
-            lecturer_usage[(assignment.slot_id, course.lecturer_id)].append(assignment.session_id)
-            cohort_usage[(assignment.slot_id, cohort_key)].append(assignment.session_id)
+            start, end = get_session_interval(course, slot)
+            dur = float(course.duration_hours)
+
+            # Record intervals
+            room_intervals[room.id][slot.day].append((start, end, assignment.session_id))
+            lecturer_intervals[lecturer.id][slot.day].append((start, end, assignment.session_id))
+            group_intervals[group_id][slot.day].append((start, end, assignment.session_id))
+
+            # Record hours
+            lecturer_daily_hours[lecturer.id][slot.day] += dur
+            lecturer_weekly_hours[lecturer.id] += dur
+
+            # Standard lists for fatigue and gaps
             course_days[assignment.course_id].append(slot.day)
             lecturer_day_slots[(course.lecturer_id, slot.day)].append(assignment.slot_id)
-            cohort_day_slots[(cohort_key, slot.day)].append(assignment.slot_id)
+            cohort_day_slots[(group_id, slot.day)].append(assignment.slot_id)
             room_fill_rates.append(min(1.0, course.student_count / max(1, room.capacity)))
 
             if assignment.slot_id in lecturer.unavailable_slots:
@@ -165,36 +198,80 @@ class ConstraintAgent:
                     )
                 )
 
+        # Enforce room overlaps based on time intervals
         if config.room_exclusivity:
-            for (_, room_id), session_ids in room_usage.items():
-                if len(session_ids) > 1:
-                    hard.append(
-                        Violation(
-                            kind="room_conflict",
-                            message=f"Room {room_id} is double-booked for sessions: {', '.join(session_ids)}.",
-                            severity="hard",
-                            weight=5.0,
-                        )
-                    )
+            for room_id, days_data in room_intervals.items():
+                for day, intervals in days_data.items():
+                    for i in range(len(intervals)):
+                        for j in range(i + 1, len(intervals)):
+                            s1, e1, id1 = intervals[i]
+                            s2, e2, id2 = intervals[j]
+                            if max(s1, s2) < min(e1, e2):
+                                room_name = rooms[room_id].name
+                                hard.append(
+                                    Violation(
+                                        kind="room_conflict",
+                                        message=f"Room {room_name} has overlapping assignments: {id1} and {id2}.",
+                                        severity="hard",
+                                        weight=5.0,
+                                    )
+                                )
 
+        # Enforce lecturer overlaps based on time intervals
         if config.lecturer_double_booking:
-            for (_, lecturer_id), session_ids in lecturer_usage.items():
-                if len(session_ids) > 1:
+            for lecturer_id, days_data in lecturer_intervals.items():
+                for day, intervals in days_data.items():
+                    for i in range(len(intervals)):
+                        for j in range(i + 1, len(intervals)):
+                            s1, e1, id1 = intervals[i]
+                            s2, e2, id2 = intervals[j]
+                            if max(s1, s2) < min(e1, e2):
+                                lecturer_name = lecturers[lecturer_id].name
+                                hard.append(
+                                    Violation(
+                                        kind="lecturer_conflict",
+                                        message=f"Lecturer {lecturer_name} is double-booked for overlapping sessions: {id1} and {id2}.",
+                                        severity="hard",
+                                        weight=5.0,
+                                    )
+                                )
+
+        # Enforce student group overlaps based on time intervals
+        for group_id, days_data in group_intervals.items():
+            for day, intervals in days_data.items():
+                for i in range(len(intervals)):
+                    for j in range(i + 1, len(intervals)):
+                        s1, e1, id1 = intervals[i]
+                        s2, e2, id2 = intervals[j]
+                        if max(s1, s2) < min(e1, e2):
+                            group_name = problem.student_groups[group_id].name if group_id in problem.student_groups else group_id
+                            hard.append(
+                                Violation(
+                                    kind="cohort_conflict",
+                                    message=f"Student group {group_name} has overlapping sessions: {id1} and {id2}.",
+                                    severity="hard",
+                                    weight=4.0,
+                                )
+                            )
+
+        # Enforce lecturer hours limits
+        for lecturer_id, lecturer in lecturers.items():
+            for day, hrs in lecturer_daily_hours[lecturer_id].items():
+                if hrs > lecturer.max_hours_per_day:
                     hard.append(
                         Violation(
-                            kind="lecturer_conflict",
-                            message=f"Lecturer {lecturer_id} is double-booked for sessions: {', '.join(session_ids)}.",
+                            kind="lecturer_daily_hours_exceeded",
+                            message=f"Lecturer {lecturer.name} exceeds daily limit on {day}: {hrs}h scheduled (limit {lecturer.max_hours_per_day}h).",
                             severity="hard",
-                            weight=5.0,
+                            weight=4.0,
                         )
                     )
-
-        for (_, cohort_key), session_ids in cohort_usage.items():
-            if len(session_ids) > 1:
+            weekly_hrs = lecturer_weekly_hours[lecturer_id]
+            if weekly_hrs > lecturer.max_hours_per_week:
                 hard.append(
                     Violation(
-                        kind="cohort_conflict",
-                        message=f"Student cohort {cohort_key} has overlapping sessions: {', '.join(session_ids)}.",
+                        kind="lecturer_weekly_hours_exceeded",
+                        message=f"Lecturer {lecturer.name} exceeds weekly limit: {weekly_hrs}h scheduled (limit {lecturer.max_hours_per_week}h).",
                         severity="hard",
                         weight=4.0,
                     )
@@ -680,6 +757,324 @@ class GeneticOptimizationAgent:
         return candidate
 
 
+class CSPSolver:
+    def __init__(self, problem: ProblemData, config: ConstraintConfig, weights: SoftConstraintWeights):
+        self.problem = problem
+        self.config = config
+        self.weights = weights
+        self.courses = problem.courses
+        self.lecturers = problem.lecturers
+        self.rooms = problem.rooms
+        self.slots = problem.slots
+        self.session_requests = problem.session_requests
+
+        # Precompute timeslot intervals
+        self.slot_intervals = {}
+        for slot_id, slot in self.slots.items():
+            self.slot_intervals[slot_id] = (
+                time_to_hours(slot.start),
+                time_to_hours(slot.end)
+            )
+
+    def solve(self, limit: int = 20000) -> Tuple[List[Assignment], List[ConflictReportEntry]]:
+        assignments: Dict[str, Assignment] = {
+            req.session_id: Assignment(session_id=req.session_id, course_id=req.course_id, lecturer_id=self.courses[req.course_id].lecturer_id)
+            for req in self.session_requests
+        }
+
+        room_schedules = defaultdict(lambda: defaultdict(list))
+        lecturer_schedules = defaultdict(lambda: defaultdict(list))
+        group_schedules = defaultdict(lambda: defaultdict(list))
+
+        lecturer_daily_hours = defaultdict(lambda: defaultdict(float))
+        lecturer_weekly_hours = defaultdict(float)
+
+        best_assignments = {k: replace(v) for k, v in assignments.items()}
+        best_scheduled_count = -1
+
+        backtrack_count = 0
+        timeout_reached = False
+
+        def get_interval(slot_id: str, course_id: str) -> Tuple[float, float]:
+            course = self.courses[course_id]
+            start_h, end_h = self.slot_intervals[slot_id]
+            slot_dur = max(0.5, end_h - start_h)
+            dur = max(float(course.duration_hours), slot_dur)
+            return start_h, start_h + dur
+
+        def check_overlap(start: float, end: float, intervals: list) -> bool:
+            for s, e, _ in intervals:
+                if max(start, s) < min(end, e):
+                    return True
+            return False
+
+        def search(req_index: int) -> bool:
+            nonlocal backtrack_count, timeout_reached, best_scheduled_count, best_assignments
+            
+            backtrack_count += 1
+            if backtrack_count > limit:
+                timeout_reached = True
+                return False
+
+            # MRV variable selection
+            unscheduled_reqs = []
+            for req in self.session_requests:
+                if assignments[req.session_id].slot_id is None:
+                    valid_pairs_count = 0
+                    course = self.courses[req.course_id]
+                    lecturer = self.lecturers[course.lecturer_id]
+                    
+                    for slot in self.slots.values():
+                        if slot.id in lecturer.unavailable_slots or slot.id in course.blocked_slots:
+                            continue
+                        
+                        start, end = get_interval(slot.id, course.id)
+                        dur = float(course.duration_hours)
+                        
+                        if lecturer_daily_hours[course.lecturer_id][slot.day] + dur > lecturer.max_hours_per_day:
+                            continue
+                        if lecturer_weekly_hours[course.lecturer_id] + dur > lecturer.max_hours_per_week:
+                            continue
+                        
+                        if check_overlap(start, end, lecturer_schedules[course.lecturer_id][slot.day]):
+                            continue
+                        if check_overlap(start, end, group_schedules[course.student_group][slot.day]):
+                            continue
+
+                        for room in self.rooms.values():
+                            if self.config.room_type_enforced and room.room_type != course.room_type:
+                                continue
+                            if self.config.room_capacity_enforced and room.capacity < course.student_count:
+                                continue
+                            if course.equipment_needed.difference(room.equipment):
+                                continue
+                            if check_overlap(start, end, room_schedules[room.id][slot.day]):
+                                continue
+                            valid_pairs_count += 1
+
+                    unscheduled_reqs.append((valid_pairs_count, req))
+
+            if not unscheduled_reqs:
+                best_scheduled_count = len(self.session_requests)
+                best_assignments = {k: replace(v) for k, v in assignments.items()}
+                return True
+
+            # Sort: MRV first, tie-breaker: largest student count first
+            unscheduled_reqs.sort(key=lambda x: (x[0], -self.courses[x[1].course_id].student_count))
+            _, next_req = unscheduled_reqs[0]
+
+            # Track best partial solution
+            scheduled_count = len(self.session_requests) - len(unscheduled_reqs)
+            if scheduled_count > best_scheduled_count:
+                best_scheduled_count = scheduled_count
+                best_assignments = {k: replace(v) for k, v in assignments.items()}
+
+            course = self.courses[next_req.course_id]
+            lecturer = self.lecturers[course.lecturer_id]
+
+            # Find and score candidates (value ordering)
+            candidates = []
+            for slot in self.slots.values():
+                if slot.id in lecturer.unavailable_slots or slot.id in course.blocked_slots:
+                    continue
+                start, end = get_interval(slot.id, course.id)
+                dur = float(course.duration_hours)
+                
+                if lecturer_daily_hours[course.lecturer_id][slot.day] + dur > lecturer.max_hours_per_day:
+                    continue
+                if lecturer_weekly_hours[course.lecturer_id] + dur > lecturer.max_hours_per_week:
+                    continue
+                
+                if check_overlap(start, end, lecturer_schedules[course.lecturer_id][slot.day]):
+                    continue
+                if check_overlap(start, end, group_schedules[course.student_group][slot.day]):
+                    continue
+
+                for room in self.rooms.values():
+                    if self.config.room_type_enforced and room.room_type != course.room_type:
+                        continue
+                    if self.config.room_capacity_enforced and room.capacity < course.student_count:
+                        continue
+                    if course.equipment_needed.difference(room.equipment):
+                        continue
+                    if check_overlap(start, end, room_schedules[room.id][slot.day]):
+                        continue
+
+                    preferred = (slot.id in lecturer.preferred_slots) or (slot.id in course.preferred_slots)
+                    room_fit = 1.0 - ((room.capacity - course.student_count) / max(1, room.capacity))
+                    
+                    score = 0.0
+                    if preferred:
+                        score += self.weights.preferred_slot
+                    score += room_fit * self.weights.room_fit
+                    if slot.start >= "16:00":
+                        score -= self.weights.fatigue_balance
+                    
+                    candidates.append((score, slot, room, start, end))
+
+            # Sort by score desc
+            candidates.sort(key=lambda x: -x[0])
+
+            for score, slot, room, start, end in candidates:
+                dur = float(course.duration_hours)
+
+                assignments[next_req.session_id].slot_id = slot.id
+                assignments[next_req.session_id].room_id = room.id
+                assignments[next_req.session_id].status = "scheduled"
+
+                room_schedules[room.id][slot.day].append((start, end, next_req.session_id))
+                lecturer_schedules[course.lecturer_id][slot.day].append((start, end, next_req.session_id))
+                group_schedules[course.student_group][slot.day].append((start, end, next_req.session_id))
+
+                lecturer_daily_hours[course.lecturer_id][slot.day] += dur
+                lecturer_weekly_hours[course.lecturer_id] += dur
+
+                if search(req_index + 1):
+                    return True
+
+                # Backtrack
+                assignments[next_req.session_id].slot_id = None
+                assignments[next_req.session_id].room_id = None
+                assignments[next_req.session_id].status = "unscheduled"
+
+                room_schedules[room.id][slot.day].remove((start, end, next_req.session_id))
+                lecturer_schedules[course.lecturer_id][slot.day].remove((start, end, next_req.session_id))
+                group_schedules[course.student_group][slot.day].remove((start, end, next_req.session_id))
+
+                lecturer_daily_hours[course.lecturer_id][slot.day] -= dur
+                lecturer_weekly_hours[course.lecturer_id] -= dur
+
+                if timeout_reached:
+                    return False
+
+            return False
+
+        search(0)
+
+        # Build conflict reports for any unscheduled sessions
+        conflict_reports: List[ConflictReportEntry] = []
+        unscheduled_sessions = [req for req in self.session_requests if best_assignments[req.session_id].slot_id is None]
+
+        best_room_schedules = defaultdict(lambda: defaultdict(list))
+        best_lecturer_schedules = defaultdict(lambda: defaultdict(list))
+        best_group_schedules = defaultdict(lambda: defaultdict(list))
+        best_lecturer_daily_hours = defaultdict(lambda: defaultdict(float))
+        best_lecturer_weekly_hours = defaultdict(float)
+
+        for req in self.session_requests:
+            assign = best_assignments[req.session_id]
+            if assign.slot_id and assign.room_id:
+                course = self.courses[req.course_id]
+                slot = self.slots[assign.slot_id]
+                room = self.rooms[assign.room_id]
+                start, end = get_interval(assign.slot_id, req.course_id)
+                dur = float(course.duration_hours)
+
+                best_room_schedules[room.id][slot.day].append((start, end, req.session_id))
+                best_lecturer_schedules[course.lecturer_id][slot.day].append((start, end, req.session_id))
+                best_group_schedules[course.student_group][slot.day].append((start, end, req.session_id))
+                best_lecturer_daily_hours[course.lecturer_id][slot.day] += dur
+                best_lecturer_weekly_hours[course.lecturer_id] += dur
+
+        for req in unscheduled_sessions:
+            course = self.courses[req.course_id]
+            lecturer = self.lecturers[course.lecturer_id]
+            student_group = self.problem.student_groups.get(course.student_group)
+            group_name = student_group.name if student_group else course.student_group
+
+            reasons = []
+            suggested_fixes = []
+
+            # Check room type existence
+            rooms_of_type = [r for r in self.rooms.values() if r.room_type == course.room_type]
+            if not rooms_of_type:
+                reasons.append(f"No rooms of required type '{course.room_type}' exist.")
+                suggested_fixes.append(f"add more rooms of type '{course.room_type}'")
+            else:
+                large_enough_rooms = [r for r in rooms_of_type if r.capacity >= course.student_count]
+                if not large_enough_rooms:
+                    max_cap = max(r.capacity for r in rooms_of_type)
+                    reasons.append(f"All rooms of type '{course.room_type}' are too small (required capacity {course.student_count}, max capacity is {max_cap}).")
+                    suggested_fixes.append("increase room capacity")
+                    suggested_fixes.append("split student group")
+                else:
+                    available_slots = [s for s in self.slots.values() if s.id not in lecturer.unavailable_slots and s.id not in course.blocked_slots]
+                    if not available_slots:
+                        reasons.append(f"Lecturer {lecturer.name} is unavailable during all slots, or all possible slots are blocked for course {course.code}.")
+                        suggested_fixes.append("reduce lecturer unavailable slots")
+                        suggested_fixes.append("add more timeslots")
+                    else:
+                        room_clash_count = 0
+                        lecturer_clash_count = 0
+                        group_clash_count = 0
+                        lecturer_limit_count = 0
+                        total_attempts = 0
+
+                        for slot in available_slots:
+                            start, end = get_interval(slot.id, course.id)
+                            dur = float(course.duration_hours)
+
+                            if best_lecturer_daily_hours[course.lecturer_id][slot.day] + dur > lecturer.max_hours_per_day:
+                                lecturer_limit_count += 1
+                                continue
+                            if best_lecturer_weekly_hours[course.lecturer_id] + dur > lecturer.max_hours_per_week:
+                                lecturer_limit_count += 1
+                                continue
+
+                            lecturer_overlap = check_overlap(start, end, best_lecturer_schedules[course.lecturer_id][slot.day])
+                            group_overlap = check_overlap(start, end, best_group_schedules[course.student_group][slot.day])
+
+                            for room in large_enough_rooms:
+                                total_attempts += 1
+                                room_overlap = check_overlap(start, end, best_room_schedules[room.id][slot.day])
+                                if room_overlap:
+                                    room_clash_count += 1
+                                if lecturer_overlap:
+                                    lecturer_clash_count += 1
+                                if group_overlap:
+                                    group_clash_count += 1
+
+                        if lecturer_clash_count >= total_attempts:
+                            reasons.append(f"Lecturer {lecturer.name} is double-booked across all available timeslots.")
+                            suggested_fixes.append("assign another lecturer")
+                            suggested_fixes.append("reduce lecturer unavailable slots")
+                        elif group_clash_count >= total_attempts:
+                            reasons.append(f"Student group {group_name} is already attending other courses during all available timeslots.")
+                            suggested_fixes.append("allow same course twice in one day")
+                            suggested_fixes.append("add more timeslots")
+                        elif room_clash_count >= total_attempts:
+                            reasons.append(f"All suitable rooms of type '{course.room_type}' are occupied during available timeslots.")
+                            suggested_fixes.append("add more rooms")
+                            suggested_fixes.append("add more timeslots")
+                        elif lecturer_limit_count > 0:
+                            reasons.append(f"Lecturer {lecturer.name} exceeds max daily/weekly teaching hours ({lecturer.max_hours_per_day}h/day, {lecturer.max_hours_per_week}h/week).")
+                            suggested_fixes.append("assign another lecturer")
+                        else:
+                            reasons.append("Unresolvable timetable density: no conflict-free timeslot/room combination exists.")
+                            suggested_fixes.append("add more timeslots")
+                            suggested_fixes.append("add more rooms")
+
+            unique_fixes = []
+            for f in suggested_fixes:
+                if f not in unique_fixes:
+                    unique_fixes.append(f)
+
+            conflict_reports.append(
+                ConflictReportEntry(
+                    course_code=course.code,
+                    lecturer_id=course.lecturer_id,
+                    student_group=group_name,
+                    required_room_type=course.room_type,
+                    student_count=course.student_count,
+                    reason="; ".join(reasons),
+                    suggested_fix=" or ".join(unique_fixes) if unique_fixes else "add more timeslots or rooms"
+                )
+            )
+
+        final_assignments = list(best_assignments.values())
+        return final_assignments, conflict_reports
+
+
 class OrchestratorAgent:
     def __init__(self) -> None:
         self.constraint_agent = ConstraintAgent()
@@ -710,32 +1105,13 @@ class OrchestratorAgent:
             training_summary = self.policy_model.train(problem, episodes=effective_training_episodes)
 
         policy = self.policy_model if strategy in {"policy", "hybrid", "genetic"} else None
+        
+        # Heuristic draft schedule (for comparison on the dashboard)
         draft = self.scheduling_agent.generate_initial_schedule(problem, config, weights, policy_model=policy)
 
-        optimization_summary = None
-        effective_strategy = adaptive_summary["effective_strategy"]
-        if effective_strategy == "heuristic":
-            final_schedule = draft
-        elif effective_strategy == "policy":
-            final_schedule = draft
-        elif effective_strategy == "genetic":
-            final_schedule, optimization_summary = self.genetic_agent.optimize(
-                problem,
-                config,
-                weights,
-                policy_model=policy,
-                population_size=adaptive_summary["population_size"],
-                generations=adaptive_summary["effective_generations"],
-            )
-        else:
-            final_schedule, optimization_summary = self.genetic_agent.optimize(
-                problem,
-                config,
-                weights,
-                policy_model=policy,
-                population_size=adaptive_summary["population_size"],
-                generations=adaptive_summary["effective_generations"],
-            )
+        # Run Constraint Satisfaction Problem (CSP) Backtracking solver as core engine
+        solver = CSPSolver(problem, config, weights)
+        final_schedule, conflict_reports = solver.solve()
 
         return self.summarize(
             problem=problem,
@@ -745,12 +1121,13 @@ class OrchestratorAgent:
             config=config,
             weights=weights,
             training_summary=training_summary,
-            optimization_summary=optimization_summary,
+            optimization_summary=None,
             adaptive_summary=adaptive_summary,
             guidelines=guidelines,
             lecturer_preferences=lecturer_preferences or [],
             natural_language_request=natural_language_request,
             disruptions=disruptions or [],
+            conflict_reports=conflict_reports,
         )
 
     def summarize(
@@ -771,6 +1148,7 @@ class OrchestratorAgent:
         disruptions: Optional[List[Dict[str, str]]] = None,
         approved: bool = False,
         feedback_log: Optional[List[Dict[str, object]]] = None,
+        conflict_reports: Optional[List[ConflictReportEntry]] = None,
     ) -> Dict[str, object]:
         config = config or ConstraintConfig()
         weights = weights or SoftConstraintWeights()
@@ -784,6 +1162,19 @@ class OrchestratorAgent:
         audit_log = self._build_audit_log(problem, assignments, final_evaluation, natural_language_request, guidelines)
         argument_terminal = self._build_argument_terminal(problem, final_evaluation)
         suggestions = self._build_suggestions(problem, assignments, final_evaluation)
+
+        if conflict_reports is None:
+            solver = CSPSolver(problem, config, weights)
+            _, conflict_reports = solver.solve()
+
+        grouped_grids = self._build_filtered_grids(problem, assignments, final_evaluation)
+        grouped_grids["global"] = {
+            "days": grid["days"],
+            "times": grid["times"],
+            "cells": grid["cells"],
+            "name": "Global Timetable"
+        }
+
         dashboard = {
             "total_courses": len(problem.courses),
             "total_lecturers": len(problem.lecturers),
@@ -824,6 +1215,85 @@ class OrchestratorAgent:
             "disruptions": disruptions or [],
             "approved": approved,
             "feedback_log": feedback_log or [],
+            "conflict_reports": [asdict(item) for item in conflict_reports],
+            "grouped_grids": grouped_grids,
+        }
+
+    def _build_filtered_grids(self, problem: ProblemData, assignments: List[Assignment], evaluation: EvaluationResult) -> Dict[str, Dict[str, object]]:
+        days = []
+        for slot in sorted(problem.slots.values(), key=lambda item: (item.day, item.start)):
+            if slot.day not in days:
+                days.append(slot.day)
+        times = []
+        for slot in sorted(problem.slots.values(), key=lambda item: item.start):
+            label = f"{slot.start} - {slot.end}"
+            if label not in times:
+                times.append(label)
+
+        violation_map = defaultdict(list)
+        for violation in evaluation.hard_violations + evaluation.soft_violations:
+            if violation.session_id:
+                violation_map[violation.session_id].append(violation.message)
+
+        def make_empty_cells():
+            return {f"{d}|{t}": [] for d in days for t in times}
+
+        student_group_grids = {}
+        lecturer_grids = {}
+        room_grids = {}
+        department_grids = {}
+
+        for g_id in problem.student_groups.keys():
+            student_group_grids[g_id] = {"days": days, "times": times, "cells": make_empty_cells(), "name": problem.student_groups[g_id].name}
+        for l_id, lecturer in problem.lecturers.items():
+            lecturer_grids[l_id] = {"days": days, "times": times, "cells": make_empty_cells(), "name": lecturer.name}
+        for r_id, room in problem.rooms.items():
+            room_grids[r_id] = {"days": days, "times": times, "cells": make_empty_cells(), "name": room.name}
+        for course in problem.courses.values():
+            dept = course.department
+            if dept and dept not in department_grids:
+                department_grids[dept] = {"days": days, "times": times, "cells": make_empty_cells(), "name": dept}
+
+        for assignment in assignments:
+            if not assignment.slot_id or not assignment.room_id:
+                continue
+            slot = problem.slots[assignment.slot_id]
+            room = problem.rooms.get(assignment.room_id)
+            course = problem.courses[assignment.course_id]
+            cell_key = f"{slot.day}|{slot.start} - {slot.end}"
+
+            card = {
+                "session_id": assignment.session_id,
+                "course_code": course.code,
+                "lecturer": problem.lecturers[course.lecturer_id].name,
+                "room": room.name if room else "TBD",
+                "slot_id": assignment.slot_id,
+                "room_id": assignment.room_id,
+                "status": "warning" if violation_map.get(assignment.session_id) else "ok",
+                "violations": violation_map.get(assignment.session_id, []),
+            }
+
+            g_id = course.student_group
+            if g_id in student_group_grids:
+                student_group_grids[g_id]["cells"][cell_key].append(card)
+
+            l_id = course.lecturer_id
+            if l_id in lecturer_grids:
+                lecturer_grids[l_id]["cells"][cell_key].append(card)
+
+            r_id = room.id
+            if r_id in room_grids:
+                room_grids[r_id]["cells"][cell_key].append(card)
+
+            dept = course.department
+            if dept in department_grids:
+                department_grids[dept]["cells"][cell_key].append(card)
+
+        return {
+            "student_groups": student_group_grids,
+            "lecturers": lecturer_grids,
+            "rooms": room_grids,
+            "departments": department_grids,
         }
 
     def _adaptive_summary(

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import threading
 import io
+import json
 import traceback
 import uuid
 from pathlib import Path
@@ -99,6 +100,7 @@ def _base_context(request: Request, active_page: str, run_id: Optional[str] = No
         "job_status": None,
         "preference_rows": [{"lecturer_id": "", "request_text": "", "slot": "", "day": ""}],
         "disruption_rows": [{"disruption_type": "", "target_id": "", "slot_id": "", "note": ""}],
+        "grids_json": "{}",
     }
 
 
@@ -261,6 +263,16 @@ def _run_context(request: Request, active_page: str, run_id: Optional[str], mess
     if not run_id or run_id not in RUN_CACHE:
         return _base_context(request, active_page, run_id, message)
     run = RUN_CACHE[run_id]
+    
+    # Reconstruct ConflictReportEntry objects if stored as dicts
+    from .models import ConflictReportEntry
+    conflict_reports = []
+    for item in run.get("conflict_reports", []):
+        if isinstance(item, dict):
+            conflict_reports.append(ConflictReportEntry(**item))
+        else:
+            conflict_reports.append(item)
+
     result = orchestrator.summarize(
         problem=run["problem"],
         assignments=run["assignments"],
@@ -278,6 +290,7 @@ def _run_context(request: Request, active_page: str, run_id: Optional[str], mess
         disruptions=run["disruptions"],
         approved=run["approved"],
         feedback_log=run["feedback_log"],
+        conflict_reports=conflict_reports,
     )
     download_id = str(uuid.uuid4())
     EXPORT_CACHE[download_id] = result["schedule_rows"]
@@ -304,6 +317,7 @@ def _run_context(request: Request, active_page: str, run_id: Optional[str], mess
         "job_status": None,
         "preference_rows": run["preference_rows"] or [{"lecturer_id": "", "request_text": "", "slot": "", "day": ""}],
         "disruption_rows": run["disruption_rows"] or [{"disruption_type": "", "target_id": "", "slot_id": "", "note": ""}],
+        "grids_json": json.dumps(result.get("grouped_grids", {})),
     }
 
 
@@ -358,6 +372,7 @@ def _store_run(
         "preference_rows": preference_rows,
         "disruption_rows": disruption_rows,
         "result": result,
+        "conflict_reports": result.get("conflict_reports", []),
     }
     return run_id
 
@@ -493,6 +508,7 @@ async def generate_schedule(
     lecturers: UploadFile | None = File(default=None),
     rooms: UploadFile | None = File(default=None),
     timeslots: UploadFile | None = File(default=None),
+    student_groups: UploadFile | None = File(default=None),
     strategy: str = Form(default="hybrid"),
     training_episodes: int = Form(default=10),
     generations: int = Form(default=8),
@@ -547,7 +563,7 @@ async def generate_schedule(
     )
 
     try:
-        base_problem = load_problem_data(courses, lecturers, rooms, timeslots)
+        base_problem = load_problem_data(courses, lecturers, rooms, timeslots, student_groups)
         working_problem = _apply_natural_language(base_problem, nl_request)
         working_problem = _apply_preference_rows(working_problem, preference_rows)
         working_problem = _apply_disruptions(working_problem, disruption_rows)

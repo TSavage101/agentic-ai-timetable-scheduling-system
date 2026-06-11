@@ -27,6 +27,9 @@ class Lecturer:
     id: str
     name: str
     unavailable_slots: frozenset[str] = frozenset()
+    preferred_slots: frozenset[str] = frozenset()
+    max_hours_per_day: int = 4
+    max_hours_per_week: int = 12
 
 
 @dataclass(frozen=True)
@@ -43,6 +46,28 @@ class Course:
     level: str = ""
     department: str = ""
     equipment_needed: frozenset[str] = frozenset()
+    duration_hours: int = 1
+    student_group: str = ""
+
+
+@dataclass(frozen=True)
+class StudentGroup:
+    id: str
+    department: str
+    level: str
+    name: str
+    student_count: int
+
+
+@dataclass
+class ConflictReportEntry:
+    course_code: str
+    lecturer_id: str
+    student_group: str
+    required_room_type: str
+    student_count: int
+    reason: str
+    suggested_fix: str
 
 
 @dataclass(frozen=True)
@@ -161,3 +186,4 @@ class ProblemData:
     rooms: Dict[str, Room]
     slots: Dict[str, TimeSlot]
     session_requests: List[SessionRequest]
+    student_groups: Dict[str, StudentGroup] = field(default_factory=dict)

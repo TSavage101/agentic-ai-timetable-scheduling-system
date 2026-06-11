@@ -1,21 +1,83 @@
 {% extends "base.html" %}
 {% block content %}
 {% if result %}
+
+{% if result.conflict_reports %}
+<section class="panel conflict-report-panel fade-in" style="margin-bottom: 24px; border: 1px solid var(--coral); background: rgba(255, 140, 105, 0.05);">
+  <div class="panel-head" style="padding: 16px 20px; border-bottom: 1px solid rgba(255, 140, 105, 0.2);">
+    <div>
+      <h2 style="color: #c53a2d; margin: 0; font-size: 1.4rem;">Timetable Conflict Report</h2>
+      <p style="margin: 4px 0 0; font-size: 0.88rem;">The CSP solver could not schedule all sessions due to hard constraints. Check the bottlenecks below:</p>
+    </div>
+  </div>
+  <div class="preview-table">
+    <table style="width: 100%; border-collapse: collapse;">
+      <thead>
+        <tr style="background: rgba(255, 140, 105, 0.1);">
+          <th style="padding: 10px; text-align: left; font-size: 0.75rem;">Course Code</th>
+          <th style="padding: 10px; text-align: left; font-size: 0.75rem;">Lecturer ID</th>
+          <th style="padding: 10px; text-align: left; font-size: 0.75rem;">Student Group</th>
+          <th style="padding: 10px; text-align: left; font-size: 0.75rem;">Required Room Type</th>
+          <th style="padding: 10px; text-align: left; font-size: 0.75rem;">Students</th>
+          <th style="padding: 10px; text-align: left; font-size: 0.75rem;">Conflict Reason</th>
+          <th style="padding: 10px; text-align: left; font-size: 0.75rem;">Suggested Fix</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for report in result.conflict_reports %}
+        <tr style="border-bottom: 1px solid rgba(255, 140, 105, 0.1);">
+          <td style="padding: 12px 10px; font-weight: bold;" class="mono-text">{{ report.course_code }}</td>
+          <td style="padding: 12px 10px;" class="mono-text">{{ report.lecturer_id }}</td>
+          <td style="padding: 12px 10px;">{{ report.student_group }}</td>
+          <td style="padding: 12px 10px;"><span class="text-chip" style="font-size: 0.75rem;">{{ report.required_room_type }}</span></td>
+          <td style="padding: 12px 10px;">{{ report.student_count }}</td>
+          <td style="padding: 12px 10px; color: #c53a2d; font-size: 0.88rem;">{{ report.reason }}</td>
+          <td style="padding: 12px 10px; color: var(--forest); font-weight: 600; font-size: 0.88rem;">{{ report.suggested_fix }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+
 <section class="command-center-layout">
   <article class="panel matrix-panel">
     <div class="panel-head">
       <div>
-        <h2>Interactive Timetable Grid</h2>
-        <p>Drag any session card into a different cell for a what-if adjustment.</p>
+        <h2>Timetable Matrix</h2>
+        <p>Use the dropdowns to switch between different timetable views.</p>
       </div>
       <div class="inline-actions">
         <a href="/download/{{ download_id }}" class="pill-link">Export CSV</a>
-        <form action="/approve" method="post">
+        <form action="/approve" method="post" style="display: inline;">
           <input type="hidden" name="run_id" value="{{ run_id }}" />
           <button type="submit">{% if result.approved %}Approved{% else %}Approve{% endif %}</button>
         </form>
       </div>
     </div>
+
+    <!-- View Selector Controls -->
+    <div class="view-selectors-bar" style="display: flex; gap: 16px; margin-bottom: 20px; padding: 12px; background: rgba(0, 0, 0, 0.02); border: 1px solid var(--grid);">
+      <label style="display: flex; align-items: center; gap: 8px; font-size: 0.82rem; font-weight: 600;">
+        <span>Timetable View Group:</span>
+        <select id="view-type-select" style="padding: 6px 12px; font-size: 0.82rem; font-family: inherit;">
+          <option value="global">Global Timetable</option>
+          <option value="student_group">Student Group Timetable</option>
+          <option value="lecturer">Lecturer Timetable</option>
+          <option value="room">Room Timetable</option>
+          <option value="department">Department Timetable</option>
+        </select>
+      </label>
+
+      <label id="subview-container" style="display: none; align-items: center; gap: 8px; font-size: 0.82rem; font-weight: 600;">
+        <span>Select Specific:</span>
+        <select id="subview-select" style="padding: 6px 12px; font-size: 0.82rem; font-family: inherit;">
+          <!-- Options populated dynamically -->
+        </select>
+      </label>
+    </div>
+
     <div class="grid-wrap">
       <table class="timetable-grid">
         <thead>
@@ -32,7 +94,7 @@
             <td class="time-cell">{{ time }}</td>
             {% for day in result.grid.days %}
             {% set cell_key = day ~ '|' ~ time %}
-            <td class="drop-cell" data-slot-id="{% for slot in slot_options %}{% if slot.day == day and (slot.start ~ ' - ' ~ slot.end) == time %}{{ slot.id }}{% endif %}{% endfor %}">
+            <td class="drop-cell" data-day="{{ day }}" data-time="{{ time }}" data-slot-id="{% for slot in slot_options %}{% if slot.day == day and (slot.start ~ ' - ' ~ slot.end) == time %}{{ slot.id }}{% endif %}{% endfor %}">
               {% for card in result.grid.cells.get(cell_key, []) %}
               <div class="session-card {{ card.status }}" draggable="true" data-session-id="{{ card.session_id }}">
                 <strong>{{ card.course_code }}</strong>
@@ -65,7 +127,7 @@
       <input type="hidden" name="target_slot_id" id="drag-slot-id" />
     </form>
   </article>
-
+ 
   <aside class="panel dark-panel terminal-panel">
     <div class="panel-head">
       <div>
@@ -97,7 +159,7 @@
     </ul>
 </aside>
 </section>
-
+ 
 <section class="content-grid">
   <article class="panel">
     <div class="panel-head">
@@ -136,7 +198,7 @@
         <p>Warnings are also surfaced directly on the schedule cards.</p>
       </div>
     </div>
-    <ul class="stack-list">
+    <div class="stack-list">
       {% if result.final_evaluation.hard_violations %}
       {% for violation in result.final_evaluation.hard_violations %}
       <li><strong>Hard</strong><p>{{ violation.message }}</p></li>
@@ -147,9 +209,122 @@
       {% for violation in result.final_evaluation.soft_violations[:5] %}
       <li><strong>Soft</strong><p>{{ violation.message }}</p></li>
       {% endfor %}
-    </ul>
+    </div>
   </article>
 </section>
+
+<!-- Inject serialized grid data for dynamic switches -->
+<script id="grids-data" type="application/json">
+  {{ grids_json|safe }}
+</script>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const gridsData = JSON.parse(document.getElementById('grids-data').textContent);
+    const viewTypeSelect = document.getElementById('view-type-select');
+    const subviewSelect = document.getElementById('subview-select');
+    const subviewContainer = document.getElementById('subview-container');
+
+    function updateGrid(viewType, subviewKey) {
+      document.querySelectorAll('.drop-cell').forEach(cell => {
+        cell.innerHTML = '';
+      });
+
+      let selectedGrid = null;
+      if (viewType === 'global') {
+        selectedGrid = gridsData.global;
+      } else {
+        const category = viewType === 'student_group' ? 'student_groups' :
+                         viewType === 'lecturer' ? 'lecturers' :
+                         viewType === 'room' ? 'rooms' :
+                         viewType === 'department' ? 'departments' : null;
+        if (category && gridsData[category]) {
+          selectedGrid = gridsData[category][subviewKey];
+        }
+      }
+
+      if (!selectedGrid) return;
+
+      for (const [cellKey, cards] of Object.entries(selectedGrid.cells)) {
+        const [day, time] = cellKey.split('|');
+        const cell = document.querySelector(`.drop-cell[data-day="${day}"][data-time="${time}"]`);
+        if (!cell) continue;
+
+        cards.forEach(card => {
+          const cardEl = document.createElement('div');
+          cardEl.className = `session-card ${card.status}`;
+          cardEl.draggable = true;
+          cardEl.dataset.sessionId = card.session_id;
+
+          cardEl.innerHTML = `
+            <strong>${card.course_code}</strong>
+            <span>${card.room}</span>
+            <span>${card.lecturer}</span>
+            <div class="session-tooltip">
+              <strong>Placement logic</strong>
+              <ul>
+                <li>Lecturer availability validated</li>
+                <li>Room fit and capacity checked</li>
+                <li>Slot conflict scan completed</li>
+                <li>Quality score preserved for this move</li>
+              </ul>
+            </div>
+          `;
+
+          if (card.violations && card.violations.length > 0) {
+            const em = document.createElement('em');
+            em.textContent = card.violations[0];
+            cardEl.appendChild(em);
+          }
+
+          // Rebind drag start event
+          cardEl.addEventListener('dragstart', (event) => {
+            event.dataTransfer.setData('text/plain', cardEl.dataset.sessionId);
+          });
+
+          cell.appendChild(cardEl);
+        });
+      }
+    }
+
+    function onViewTypeChange() {
+      const viewType = viewTypeSelect.value;
+      subviewSelect.innerHTML = '';
+
+      if (viewType === 'global') {
+        subviewContainer.style.display = 'none';
+        updateGrid('global');
+      } else {
+        subviewContainer.style.display = 'flex';
+        const category = viewType === 'student_group' ? 'student_groups' :
+                         viewType === 'lecturer' ? 'lecturers' :
+                         viewType === 'room' ? 'rooms' : 'departments';
+        
+        const categoryData = gridsData[category] || {};
+        const keys = Object.keys(categoryData).sort();
+        keys.forEach(key => {
+          const opt = document.createElement('option');
+          opt.value = key;
+          opt.textContent = categoryData[key].name || key;
+          subviewSelect.appendChild(opt);
+        });
+
+        if (keys.length > 0) {
+          subviewSelect.value = keys[0];
+          updateGrid(viewType, keys[0]);
+        } else {
+          document.querySelectorAll('.drop-cell').forEach(cell => cell.innerHTML = '');
+        }
+      }
+    }
+
+    viewTypeSelect.addEventListener('change', onViewTypeChange);
+    subviewSelect.addEventListener('change', () => {
+      updateGrid(viewTypeSelect.value, subviewSelect.value);
+    });
+  });
+</script>
+
 {% else %}
 <section class="empty-state">
   <h2>No timetable generated yet</h2>
