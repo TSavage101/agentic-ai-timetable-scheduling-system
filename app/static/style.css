@@ -126,6 +126,33 @@ a {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-shrink: 0;
+}
+
+.run-ai-btn {
+  background: linear-gradient(135deg, #2563eb 0%, #4f46e5 100%) !important;
+  color: white !important;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+  border: none !important;
+}
+
+.run-ai-btn:hover {
+  background: linear-gradient(135deg, #1d4ed8 0%, #4338ca 100%) !important;
+  box-shadow: 0 6px 16px rgba(79, 70, 229, 0.4) !important;
+  transform: translateY(-1px);
+}
+
+.sparkle-icon {
+  width: 14px;
+  height: 14px;
+  margin-left: 6px;
+  flex-shrink: 0;
+  animation: sparkle-pulse 2s infinite ease-in-out;
+}
+
+@keyframes sparkle-pulse {
+  0%, 100% { transform: scale(1) rotate(0deg); opacity: 0.8; }
+  50% { transform: scale(1.25) rotate(15deg); opacity: 1; }
 }
 
 .shell-main {
@@ -502,6 +529,8 @@ button,
   cursor: pointer;
   transition: all 150ms ease;
   border: 1px solid transparent;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 button,
@@ -680,7 +709,7 @@ button:hover,
 }
 
 /* Responsive Header Design */
-@media (max-width: 1023px) {
+@media (max-width: 1149px) {
   .shell-header {
     padding: 0 20px;
   }
@@ -725,5 +754,41 @@ button:hover,
   
   .shell-header__actions {
     display: none;
+  }
+}
+
+/* Intermediate screen sizing to prevent header squeeze */
+@media (max-width: 1299px) and (min-width: 1150px) {
+  .shell-header {
+    padding: 0 20px;
+  }
+  
+  .shell-header__left strong {
+    font-size: 0.95rem;
+  }
+  
+  .shell-header__left p {
+    font-size: 0.7rem;
+  }
+  
+  .nav-list {
+    gap: 12px;
+  }
+  
+  .nav-link {
+    font-size: 0.8rem;
+    padding: 6px 10px;
+  }
+  
+  .shell-header__actions {
+    gap: 8px;
+  }
+  
+  button,
+  .primary-link,
+  .pill-link,
+  .ghost-button {
+    padding: 8px 14px;
+    font-size: 0.8rem;
   }
 }

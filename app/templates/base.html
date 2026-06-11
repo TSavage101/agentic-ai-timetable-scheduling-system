@@ -32,7 +32,13 @@
       </nav>
       <div class="shell-header__actions">
         <a href="/resources{% if run_id %}?run_id={{ run_id }}{% endif %}" class="ghost-button top-action">RESOURCES</a>
-        <a href="/generate{% if run_id %}?run_id={{ run_id }}{% endif %}" class="primary-link top-action">RUN AI</a>
+        <a href="/generate{% if run_id %}?run_id={{ run_id }}{% endif %}" class="primary-link top-action run-ai-btn">
+          <span>RUN AI</span>
+          <svg class="sparkle-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M9.813 15.904L9 21L8.188 15.904L3 15L8.188 14.096L9 9L9.813 14.096L15 15L9.813 15.904Z" fill="currentColor"/>
+            <path d="M19.071 7.071L18.5 10.5L17.929 7.071L14.5 6.5L17.929 5.929L18.5 2.5L19.071 5.929L22.5 6.5L19.071 7.071Z" fill="currentColor"/>
+          </svg>
+        </a>
       </div>
     </header>
 
