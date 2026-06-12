@@ -94,14 +94,6 @@
             </span>
             <h1>{{ page_title }}</h1>
             <p class="hero-subtitle">{{ page_subtitle }}</p>
-            <div class="hero-meta">
-              {% if run_id %}
-              <span class="run-badge">RUN {{ run_id[:8] }}</span>
-              {% endif %}
-              {% if result and result.adaptive_summary %}
-              <span class="run-badge">MODE {{ result.adaptive_summary.effective_strategy|upper }}</span>
-              {% endif %}
-            </div>
           </div>
         </section>
 

@@ -1221,7 +1221,8 @@ class OrchestratorAgent:
 
     def _build_filtered_grids(self, problem: ProblemData, assignments: List[Assignment], evaluation: EvaluationResult) -> Dict[str, Dict[str, object]]:
         days = []
-        for slot in sorted(problem.slots.values(), key=lambda item: (item.day, item.start)):
+        DAY_ORDER = {"monday": 1, "tuesday": 2, "wednesday": 3, "thursday": 4, "friday": 5, "saturday": 6, "sunday": 7}
+        for slot in sorted(problem.slots.values(), key=lambda item: (DAY_ORDER.get(item.day.lower(), 99), item.start)):
             if slot.day not in days:
                 days.append(slot.day)
         times = []
@@ -1396,7 +1397,8 @@ class OrchestratorAgent:
 
     def _build_grid(self, problem: ProblemData, assignments: List[Assignment], evaluation: EvaluationResult) -> Dict[str, object]:
         days = []
-        for slot in sorted(problem.slots.values(), key=lambda item: (item.day, item.start)):
+        DAY_ORDER = {"monday": 1, "tuesday": 2, "wednesday": 3, "thursday": 4, "friday": 5, "saturday": 6, "sunday": 7}
+        for slot in sorted(problem.slots.values(), key=lambda item: (DAY_ORDER.get(item.day.lower(), 99), item.start)):
             if slot.day not in days:
                 days.append(slot.day)
         times = []
