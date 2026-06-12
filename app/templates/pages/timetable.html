@@ -72,11 +72,14 @@
         </select>
       </div>
 
-      <div class="selector-item" id="subview-container" style="display: none;">
+      <div class="selector-item" id="subview-container" style="display: none; max-width: 500px;">
         <span>Select Specific Target</span>
-        <select id="subview-select">
-          <!-- Populated dynamically via JS -->
-        </select>
+        <div style="display: flex; gap: 8px; align-items: center; width: 100%;">
+          <input type="text" id="target-search-input" placeholder="Search target..." style="padding: 8px 12px; border: 1px solid var(--grid-border); border-radius: var(--radius-sm); font-size: 0.85rem; width: 160px;" />
+          <select id="subview-select" style="flex: 1;">
+            <!-- Populated dynamically via JS -->
+          </select>
+        </div>
       </div>
     </div>
 
@@ -282,34 +285,59 @@
       }
     }
 
+    let currentCategoryKeys = [];
+
+    function renderFilteredOptions(filterText = '') {
+      subviewSelect.innerHTML = '';
+      const filtered = currentCategoryKeys.filter(item => 
+        item.name.toLowerCase().includes(filterText.toLowerCase()) ||
+        item.key.toLowerCase().includes(filterText.toLowerCase())
+      );
+
+      filtered.forEach(item => {
+        const opt = document.createElement('option');
+        opt.value = item.key;
+        opt.textContent = item.name;
+        subviewSelect.appendChild(opt);
+      });
+
+      if (filtered.length > 0) {
+        const currentValue = subviewSelect.value;
+        const exists = filtered.some(item => item.key === currentValue);
+        if (!exists) {
+          subviewSelect.value = filtered[0].key;
+          updateGrid(viewTypeSelect.value, filtered[0].key);
+        } else {
+          subviewSelect.value = currentValue;
+        }
+      } else {
+        document.querySelectorAll('.drop-cell').forEach(cell => cell.innerHTML = '');
+      }
+    }
+
     function onViewTypeChange() {
       const viewType = viewTypeSelect.value;
-      subviewSelect.innerHTML = '';
+      const searchInput = document.getElementById('target-search-input');
+      if (searchInput) searchInput.value = '';
 
       if (viewType === 'global') {
-        subviewContainer.style.display = 'none';
+        subviewContainer.style.setProperty('display', 'none', 'important');
         updateGrid('global');
       } else {
-        subviewContainer.style.display = 'flex';
+        subviewContainer.style.setProperty('display', 'flex', 'important');
         const category = viewType === 'student_group' ? 'student_groups' :
                          viewType === 'lecturer' ? 'lecturers' :
                          viewType === 'room' ? 'rooms' : 'departments';
         
         const categoryData = gridsData[category] || {};
         const keys = Object.keys(categoryData).sort();
-        keys.forEach(key => {
-          const opt = document.createElement('option');
-          opt.value = key;
-          opt.textContent = categoryData[key].name || key;
-          subviewSelect.appendChild(opt);
-        });
+        
+        currentCategoryKeys = keys.map(key => ({
+          key: key,
+          name: categoryData[key].name || key
+        }));
 
-        if (keys.length > 0) {
-          subviewSelect.value = keys[0];
-          updateGrid(viewType, keys[0]);
-        } else {
-          document.querySelectorAll('.drop-cell').forEach(cell => cell.innerHTML = '');
-        }
+        renderFilteredOptions('');
       }
     }
 
@@ -317,6 +345,13 @@
     subviewSelect.addEventListener('change', () => {
       updateGrid(viewTypeSelect.value, subviewSelect.value);
     });
+
+    const searchInput = document.getElementById('target-search-input');
+    if (searchInput) {
+      searchInput.addEventListener('input', (e) => {
+        renderFilteredOptions(e.target.value);
+      });
+    }
   });
 </script>
 
