@@ -711,8 +711,17 @@ tr:last-child td {
 }
 
 /* Timetable-specific styling */
+.timetable-grid {
+  border: 1.5px solid #cbd5e1;
+}
+
 .timetable-grid th {
   min-width: 140px;
+  border: 1.5px solid #cbd5e1;
+}
+
+.timetable-grid td {
+  border: 1.5px solid #cbd5e1;
 }
 
 .time-cell {
@@ -720,13 +729,14 @@ tr:last-child td {
   font-weight: 600;
   color: var(--forest);
   text-align: center;
+  border: 1.5px solid #cbd5e1;
 }
 
 .drop-cell {
   background: var(--surface);
   min-height: 110px;
   padding: 8px;
-  border: 1px solid var(--grid-border);
+  border: 1.5px solid #cbd5e1;
   transition: background 0.15s ease;
 }
 
