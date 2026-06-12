@@ -30,12 +30,12 @@ JOB_CACHE: Dict[str, Dict[str, Any]] = {}
 
 NAV_ITEMS = [
     ("dashboard", "Dashboard", "/dashboard"),
-    ("generate", "Generate", "/generate"),
-    ("timetable", "Timetable Grid", "/timetable"),
-    ("scenarios", "Scenarios", "/scenarios"),
-    ("resources", "Resources", "/resources"),
+    ("generate", "Generate Schedule", "/generate"),
+    ("timetable", "Timetable", "/timetable"),
+    ("audit", "AI Decisions", "/audit"),
+    ("resources", "Rooms & Lecturers", "/resources"),
+    ("scenarios", "Disruptions", "/scenarios"),
     ("feedback", "Feedback", "/feedback"),
-    ("audit", "Audit Log", "/audit"),
     ("settings", "Settings", "/settings"),
 ]
 

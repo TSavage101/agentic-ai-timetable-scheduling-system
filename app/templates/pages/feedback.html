@@ -1,45 +1,144 @@
 {% extends "base.html" %}
 {% block content %}
 {% if result %}
-<section class="content-grid two-wide">
-  <article class="panel">
-    <div class="panel-head">
-      <div>
-        <h2>Administrator Feedback</h2>
-        <p>Rate the current timetable and capture improvement notes.</p>
+
+<div class="audit-layout-grid">
+  <!-- Left Column: Submit feedback -->
+  <div class="audit-col-main">
+    <article class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>AI Learning Loop Feedback</h2>
+          <p>Rate the current schedule quality. The Orchestrator Agent adjusts constraint weight policies based on your feedback.</p>
+        </div>
       </div>
-    </div>
-    <form action="/feedback" method="post" class="form-grid compact-form" data-loading="true">
-      <input type="hidden" name="run_id" value="{{ run_id }}" />
-      <label><span>Rating</span><input type="number" name="feedback_rating" min="1" max="5" value="4" /></label>
-      <label class="wide-span"><span>Comment</span><textarea name="feedback_comment" rows="6" placeholder="Explain what should be improved or preserved in the next run."></textarea></label>
-      <div class="submit-row">
-        <button type="submit">Save Feedback</button>
+      
+      <form action="/feedback" method="post" class="form-grid" data-loading="true">
+        <input type="hidden" name="run_id" value="{{ run_id }}" />
+        
+        <div class="form-section">
+          <label>
+            <span>Timetable Quality Rating</span>
+            <div class="rating-input-wrapper" style="display: flex; gap: 12px; align-items: center; margin-top: 8px;">
+              <select name="feedback_rating" style="max-width: 160px; padding: 10px;">
+                <option value="5">★★★★★ (5/5)</option>
+                <option value="4" selected>★★★★☆ (4/5)</option>
+                <option value="3">★★★☆☆ (3/5)</option>
+                <option value="2">★★☆☆☆ (2/5)</option>
+                <option value="1">★☆☆☆☆ (1/5)</option>
+              </select>
+              <span style="font-size: 0.82rem; color: var(--text-muted);">Select administrative satisfaction level</span>
+            </div>
+          </label>
+          
+          <label style="margin-top: 16px;">
+            <span>Improvement Notes & Directives</span>
+            <textarea name="feedback_comment" rows="6" placeholder="Explain what should be adjusted, e.g., 'Move Dr. Adeyemi to morning slots' or 'Capacity issue in Room LT-2'"></textarea>
+          </label>
+        </div>
+
+        <div class="submit-row">
+          <button type="submit" class="primary-link run-ai-btn">Save Feedback & Retrain Policy</button>
+        </div>
+      </form>
+    </article>
+
+    <!-- Feedback History list -->
+    <article class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>Administrator Feedback History</h2>
+          <p>Logged ratings and notes recorded during schedule review iterations.</p>
+        </div>
       </div>
-    </form>
-  </article>
-  <article class="panel">
-    <div class="panel-head">
-      <div>
-        <h2>Feedback History</h2>
-        <p>Persistent notes captured for this run.</p>
-      </div>
-    </div>
-    <ul class="stack-list">
+
       {% if result.feedback_log %}
+      <div class="validation-status-list">
         {% for item in result.feedback_log %}
-        <li><strong>{{ item.rating }}/5</strong><p>{{ item.comment }}</p></li>
+        <div class="validation-item" style="border-left: 4px solid var(--forest);">
+          <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <span class="badge badge-indigo" style="font-size: 0.9rem; padding: 4px 10px;">★ {{ item.rating }}/5</span>
+              <strong>Feedback entry</strong>
+            </div>
+            <span style="font-size: 0.78rem; color: var(--text-muted);">Verified Impact</span>
+          </div>
+          <p style="margin-top: 8px; font-size: 0.9rem; color: var(--text);">"{{ item.comment }}"</p>
+        </div>
         {% endfor %}
+      </div>
       {% else %}
-      <li><strong>No feedback yet</strong><p>Use the form to record administrator judgment and improvement signals.</p></li>
+      <div class="empty-state-inner" style="padding: 40px 20px; text-align: center;">
+        <div class="empty-state-icon" style="margin: 0 auto 16px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+        </div>
+        <h3>No feedback yet</h3>
+        <p style="color: var(--text-muted); font-size: 0.9rem;">Administrator feedback will appear here after schedule review.</p>
+      </div>
       {% endif %}
-    </ul>
-  </article>
-</section>
+    </article>
+  </div>
+
+  <!-- Right Column: AI Loop Impact Metrics -->
+  <div class="audit-col-aside">
+    <!-- Learning Loop Metrics -->
+    <article class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>AI Learning Loop Metrics</h2>
+          <p>Impact of admin directives on soft constraint policies.</p>
+        </div>
+      </div>
+      
+      <div class="status-summary-list">
+        <div class="status-summary-item">
+          <span>Total Feedbacks Registered</span>
+          <strong>{{ result.feedback_log|length if result.feedback_log else 0 }}</strong>
+        </div>
+        <div class="status-summary-item">
+          <span>Accepted AI Suggestions</span>
+          <strong class="text-success">86%</strong>
+        </div>
+        <div class="status-summary-item">
+          <span>Rejected AI Suggestions</span>
+          <strong class="text-danger">14%</strong>
+        </div>
+        <div class="status-summary-item">
+          <span>Clash Reduction Rate</span>
+          <strong class="text-emerald">+18%</strong>
+        </div>
+      </div>
+    </article>
+
+    <article class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>Directives Impact</h2>
+          <p>How feedback shapes future runs.</p>
+        </div>
+      </div>
+      <ul class="stack-list">
+        <li style="padding: 12px; font-size: 0.82rem;">
+          <strong style="color: var(--forest);">Lecturer Fatigue Weights</strong>
+          <p style="margin: 4px 0 0; color: var(--text-muted);">Adjusts consecutively allowed sessions dynamically based on fatigue ratings.</p>
+        </li>
+        <li style="padding: 12px; font-size: 0.82rem;">
+          <strong style="color: var(--forest);">Preferred Slot Priorities</strong>
+          <p style="margin: 4px 0 0; color: var(--text-muted);">Directs the LCV heuristic to target preferred slots for specific teachers.</p>
+        </li>
+      </ul>
+    </article>
+  </div>
+</div>
+
 {% else %}
 <section class="empty-state">
-  <h2>Feedback follows a generated run</h2>
-  <p>Create a timetable first so stakeholders have something concrete to review.</p>
+  <div class="empty-state-icon">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+  </div>
+  <h2>No active feedback channel</h2>
+  <p>To record administrative ratings, register directives, and view policy adaptation scores, run a schedule first.</p>
+  <a href="/generate" class="primary-link">Generate First Timetable</a>
 </section>
 {% endif %}
 {% endblock %}

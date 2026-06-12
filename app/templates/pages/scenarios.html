@@ -1,58 +1,145 @@
 {% extends "base.html" %}
 {% block content %}
 {% if result %}
-<section class="content-grid">
-  <article class="panel">
-    <div class="panel-head">
-      <div>
-        <h2>What-If Comparison</h2>
-        <p>Draft versus final optimization comparison for trade-off analysis.</p>
+
+<div class="audit-layout-grid">
+  <!-- Left Column: Active Disruptions & Alerts -->
+  <div class="audit-col-main">
+    <article class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>Active Disruptions & Incident Log</h2>
+          <p>Real-time tracking of lecturer absences, facilities maintenance, and schedule conflicts.</p>
+        </div>
       </div>
-    </div>
-    <div class="comparison-grid">
-      {% for item in result.comparison %}
-      <div class="compare-card">
-        <span>{{ item.label }}</span>
-        <strong>{{ item.value }}</strong>
-      </div>
+
+      {% set active_disruptions = [] %}
+      {% for item in disruption_rows %}
+        {% if item.disruption_type %}
+          {% set _ = active_disruptions.append(item) %}
+        {% endif %}
       {% endfor %}
-    </div>
-  </article>
-  <article class="panel">
-    <div class="panel-head">
-      <div>
-        <h2>Optimization History</h2>
-        <p>Search path quality over repair and evolutionary passes.</p>
-      </div>
-    </div>
-    <div class="history-rail">
-      {% if result.optimization_summary and result.optimization_summary.history %}
-        {% for score in result.optimization_summary.history %}
-        <div class="history-bar"><span style="height: {{ score }}%"></span><label>{{ loop.index }}</label></div>
+
+      {% if active_disruptions %}
+      <div class="disruptions-stack">
+        {% for item in active_disruptions %}
+        <div class="disruption-alert-card">
+          <div class="disruption-card-header">
+            <span class="disruption-badge urgent">
+              {% if item.disruption_type == 'lecturer_unavailable' %}
+                Lecturer Absent
+              {% else %}
+                Facility Maintenance
+              {% endif %}
+            </span>
+            <span class="disruption-timestamp">Active Incident</span>
+          </div>
+          
+          <div class="disruption-body">
+            <p><strong>Impacted Target:</strong> {{ item.target_id }} &middot; <strong>Impacted Slot:</strong> {{ item.slot_id }}</p>
+            <p class="disruption-note"><strong>Admin Note:</strong> "{{ item.note or 'No description provided.' }}"</p>
+            
+            <div class="ai-fix-box">
+              <div class="ai-fix-header">
+                <svg class="sparkle-icon" viewBox="0 0 24 24" fill="currentColor" style="margin: 0; width: 14px; height: 14px;"><path d="M9.813 15.904L9 21L8.188 15.904L3 15L8.188 14.096L9 9L9.813 14.096L15 15L9.813 15.904Z"/><path d="M19.071 7.071L18.5 10.5L17.929 7.071L14.5 6.5L17.929 5.929L18.5 2.5L19.071 5.929L22.5 6.5L19.071 7.071Z"/></svg>
+                <strong>Suggested AI Auto-Fix:</strong>
+              </div>
+              <p>Re-route the course session allocations. Shift course classes associated with {{ item.target_id }} to alternative slots or rooms without creating lecturer clashes.</p>
+              <div class="ai-fix-actions">
+                <button type="button" class="btn-success-sm">Accept AI Fix</button>
+                <a href="/timetable?run_id={{ run_id }}" class="btn-outline-sm">Edit Manually</a>
+                <button type="button" class="btn-ghost-sm text-red">Ignore Incident</button>
+              </div>
+            </div>
+          </div>
+        </div>
         {% endfor %}
-      {% else %}
-      <div class="empty-inline">No generational history for this run.</div>
-      {% endif %}
-    </div>
-  </article>
-  <article class="panel">
-    <div class="panel-head">
-      <div>
-        <h2>Scenario Interpretation</h2>
-        <p>How to explain the current run to a client or panel.</p>
       </div>
-    </div>
-    <ul class="stack-list">
-      <li><strong>Draft State</strong><p>The draft gives the first feasible answer before deeper repair and optimization.</p></li>
-      <li><strong>Final State</strong><p>The final state balances validity, comfort, and utilization under the chosen strategy.</p></li>
-      <li><strong>Manual What-If</strong><p>Use the grid page to test a human override and immediately re-evaluate trade-offs.</p></li>
-    </ul>
-  </article>
-</section>
+      {% else %}
+      <div class="empty-state-inner" style="padding: 40px 20px; text-align: center;">
+        <div class="empty-state-icon" style="margin: 0 auto 16px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+        </div>
+        <h3>No disruptions detected</h3>
+        <p style="color: var(--text-muted); font-size: 0.9rem;">Your current timetable has no active emergency changes.</p>
+      </div>
+      {% endif %}
+    </article>
+    
+    <!-- What-If Comparison Panel -->
+    <article class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>What-If Scenario Comparison</h2>
+          <p>Draft allocations versus optimized solver result statistics.</p>
+        </div>
+      </div>
+      <div class="comparison-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 16px;">
+        {% for item in result.comparison %}
+        <div class="kpi-metric-entry" style="text-align: center;">
+          <span class="metric-label" style="font-size: 0.75rem;">{{ item.label }}</span>
+          <strong class="metric-val text-indigo" style="font-size: 1.35rem; margin-top: 4px;">{{ item.value }}</strong>
+        </div>
+        {% endfor %}
+      </div>
+    </article>
+  </div>
+
+  <!-- Right Column: Optimization Logs & Metadata -->
+  <div class="audit-col-aside">
+    <article class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>Solver Quality History</h2>
+          <p>Search path optimization scores across generational loops.</p>
+        </div>
+      </div>
+      <div class="history-rail-wrapper" style="padding: 16px 0;">
+        <div class="history-rail" style="display: flex; align-items: flex-end; justify-content: space-between; height: 140px; border-bottom: 2px solid var(--grid-border); padding-bottom: 12px; margin-bottom: 12px;">
+          {% if result.optimization_summary and result.optimization_summary.history %}
+            {% for score in result.optimization_summary.history %}
+            <div class="history-bar" style="flex: 1; margin: 0 4px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%;">
+              <span class="bar-fill" style="width: 100%; height: {{ score }}%; background: var(--forest); border-radius: 2px; transition: height 0.3s ease;"></span>
+              <label style="font-size: 0.7rem; color: var(--text-muted); margin-top: 6px;">{{ loop.index }}</label>
+            </div>
+            {% endfor %}
+          {% else %}
+          <div style="width: 100%; text-align: center; color: var(--text-muted); font-size: 0.85rem;">No historical scores logged for this solver run.</div>
+          {% endif %}
+        </div>
+        <span style="font-size: 0.72rem; color: var(--text-muted); display: block; text-align: center;">Generational Iterations (X) vs. Constraint Quality Score (Y)</span>
+      </div>
+    </article>
+
+    <article class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>Administrative Directives</h2>
+          <p>Direct manual overrides guidelines.</p>
+        </div>
+      </div>
+      <ul class="stack-list">
+        <li style="padding: 12px; font-size: 0.82rem;">
+          <strong style="color: var(--forest);">Draft Placement</strong>
+          <p style="margin: 4px 0 0; color: var(--text-muted);">Initial allocation profile before AI repair layers run.</p>
+        </li>
+        <li style="padding: 12px; font-size: 0.82rem;">
+          <strong style="color: var(--forest);">Final Optimization</strong>
+          <p style="margin: 4px 0 0; color: var(--text-muted);">Balances availability preferences, lecturer fatigue, and capacity fits.</p>
+        </li>
+      </ul>
+    </article>
+  </div>
+</div>
+
 {% else %}
 <section class="empty-state">
-  <h2>No scenario data yet</h2>
-  <p>Generate a timetable run first to unlock comparison views.</p>
+  <div class="empty-state-icon">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+  </div>
+  <h2>No active schedule comparison</h2>
+  <p>To inspect dynamic disruptions, accept solver auto-fixes, and run what-if comparative audits, generate a schedule first.</p>
+  <a href="/generate" class="primary-link">Generate First Timetable</a>
 </section>
 {% endif %}
 {% endblock %}

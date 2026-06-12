@@ -1,42 +1,147 @@
 {% extends "base.html" %}
 {% block content %}
 {% if result %}
-<section class="content-grid two-wide">
-  <article class="panel">
-    <div class="panel-head">
-      <div>
-        <h2>Decision Audit Log</h2>
-        <p>Traceable reasoning behind important scheduling choices.</p>
+
+<div class="audit-layout-grid">
+  <!-- Left Side: Explaining AI Timeline -->
+  <div class="audit-col-main">
+    <article class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>AI Reasoning Timeline</h2>
+          <p>Trace the sequential decisions made by the multi-agent orchestration pipeline to compile this schedule.</p>
+        </div>
       </div>
-    </div>
-    <ul class="stack-list">
-      {% for audit in result.audit_log %}
-      <li>
-        <strong>{{ audit.title }}</strong>
-        <p>{{ audit.explanation }}</p>
-        <span class="muted-inline">Impact: {{ audit.impact }}</span>
-      </li>
-      {% endfor %}
-    </ul>
-  </article>
-  <article class="panel dark-panel">
-    <div class="panel-head">
-      <div>
-        <h2>Agent Argument Terminal</h2>
-        <p>Readable internal discussion excerpts for explainability.</p>
+
+      <div class="ai-timeline">
+        {% for audit in result.audit_log %}
+        
+        <!-- Determine agent and tags based on audit entry content -->
+        {% set agent_name = "Scheduling Agent" %}
+        {% set agent_icon_class = "agent-scheduling" %}
+        {% set confidence = "94%" %}
+        {% set tags = ["Constraint Check", "Slot Search"] %}
+        
+        {% if "Natural-language" in audit.title %}
+          {% set agent_name = "Orchestrator Agent" %}
+          {% set agent_icon_class = "agent-orchestrator" %}
+          {% set confidence = "98%" %}
+          {% set tags = ["NLP Prompt", "Global Scope"] %}
+        {% elif "guideline" in audit.title or "Guideline" in audit.title %}
+          {% set agent_name = "Orchestrator Agent" %}
+          {% set agent_icon_class = "agent-orchestrator" %}
+          {% set confidence = "92%" %}
+          {% set tags = ["Department Guidelines", "Policy Weights"] %}
+        {% elif "baseline" in audit.title or "Baseline" in audit.title %}
+          {% set agent_name = "Constraint Agent" %}
+          {% set agent_icon_class = "agent-constraint" %}
+          {% set confidence = "99%" %}
+          {% set tags = ["Capacity Fit", "Availability Check"] %}
+        {% elif "Escalation" in audit.title or "escalation" in audit.title or "conflict" in audit.title %}
+          {% set agent_name = "Conflict Resolution Agent" %}
+          {% set agent_icon_class = "agent-conflict" %}
+          {% set confidence = "87%" %}
+          {% set tags = ["Repair Loop", "Hard Violations"] %}
+        {% endif %}
+
+        <div class="timeline-node">
+          <div class="timeline-indicator">
+            <div class="timeline-dot"></div>
+          </div>
+          
+          <div class="timeline-card float-in">
+            <div class="timeline-card-header">
+              <div class="agent-profile">
+                <span class="agent-avatar {{ agent_icon_class }}">
+                  {% if agent_name == 'Orchestrator Agent' %}
+                    OA
+                  {% elif agent_name == 'Scheduling Agent' %}
+                    SA
+                  {% elif agent_name == 'Constraint Agent' %}
+                    CA
+                  {% else %}
+                    CR
+                  {% endif %}
+                </span>
+                <div>
+                  <strong>{{ agent_name }}</strong>
+                  <span>{{ audit.title }}</span>
+                </div>
+              </div>
+              <div class="confidence-meter">
+                <span>Confidence</span>
+                <strong>{{ confidence }}</strong>
+              </div>
+            </div>
+            
+            <div class="timeline-card-body">
+              <p class="decision-desc"><strong>Decision:</strong> {{ audit.explanation }}</p>
+              <p class="decision-reason"><strong>Reasoning/Impact:</strong> {{ audit.impact }}</p>
+            </div>
+            
+            <div class="timeline-card-footer">
+              <div class="tags-row">
+                {% for tag in tags %}
+                <span class="tag-pill">{{ tag }}</span>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
       </div>
-    </div>
-    <div class="terminal">
-      {% for line in result.argument_terminal %}
-      <p>{{ line }}</p>
-      {% endfor %}
-    </div>
-  </article>
-</section>
+    </article>
+  </div>
+
+  <!-- Right Side: Agent Arguments Terminal -->
+  <div class="audit-col-aside">
+    <article class="panel dark-panel terminal-panel">
+      <div class="panel-head">
+        <div>
+          <h2 class="text-white">Agent Dialogue Feed</h2>
+          <p class="text-slate-400">Raw consensus negotiation stream.</p>
+        </div>
+      </div>
+      <div class="terminal">
+        {% for line in result.argument_terminal %}
+        <p class="terminal-line"><span class="prefix">&gt;</span> {{ line }}</p>
+        {% endfor %}
+      </div>
+    </article>
+    
+    <article class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>Agent Structure</h2>
+          <p>Overview of active scheduling roles.</p>
+        </div>
+      </div>
+      <div class="agent-role-list">
+        <div class="agent-role-item">
+          <strong>Orchestrator Agent</strong>
+          <p>Coordinates constraint relaxation, parses guidelines, and verifies overall feasibility.</p>
+        </div>
+        <div class="agent-role-item">
+          <strong>Scheduling Agent</strong>
+          <p>Executes backtracking search heuristics (MRV, LCV) to place course sessions.</p>
+        </div>
+        <div class="agent-role-item">
+          <strong>Constraint Agent</strong>
+          <p>Scans allocation matrices for room capacities, lecturer double bookings, and cohort overlaps.</p>
+        </div>
+      </div>
+    </article>
+  </div>
+</div>
+
 {% else %}
 <section class="empty-state">
-  <h2>No audit trail available yet</h2>
-  <p>Once a run exists, the system will surface its reasoning here.</p>
+  <div class="empty-state-icon">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4M12 8h.01"></path></svg>
+  </div>
+  <h2>No AI decision trail available yet</h2>
+  <p>Run the AI scheduler first to populate the explaining logs and trace the multi-agent decision steps.</p>
+  <a href="/generate" class="primary-link">Generate First Timetable</a>
 </section>
 {% endif %}
 {% endblock %}

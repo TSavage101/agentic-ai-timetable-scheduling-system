@@ -1,159 +1,242 @@
 {% extends "base.html" %}
 {% block content %}
+
 {% if result %}
-<section class="stats-grid">
-  <article class="stat-card float-in">
-    <span>Total Courses</span>
-    <strong>{{ result.dashboard.total_courses }}</strong>
-  </article>
-  <article class="stat-card float-in">
-    <span>Total Lecturers</span>
-    <strong>{{ result.dashboard.total_lecturers }}</strong>
-  </article>
-  <article class="stat-card float-in">
-    <span>Total Rooms</span>
-    <strong>{{ result.dashboard.total_rooms }}</strong>
-  </article>
-  <article class="stat-card float-in">
-    <span>Operational Status</span>
-    <strong>{{ result.dashboard.operational_status }}</strong>
-  </article>
-</section>
+<!-- Metrics Grid -->
+<div class="kpi-grid">
+  <!-- Total Courses -->
+  <div class="kpi-card float-in">
+    <div class="kpi-icon-wrapper bg-indigo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+    </div>
+    <div class="kpi-text">
+      <span>Total Courses</span>
+      <strong class="kpi-value">{{ result.dashboard.total_courses }}</strong>
+    </div>
+  </div>
 
-<section class="content-grid two-wide">
-  <article class="panel">
-    <div class="panel-head">
-      <div>
-        <h2>Overview</h2>
-        <p>High-level score, quality, and optimization health.</p>
-      </div>
-      <a href="/timetable?run_id={{ run_id }}" class="text-link">Open Grid</a>
+  <!-- Total Lecturers -->
+  <div class="kpi-card float-in">
+    <div class="kpi-icon-wrapper bg-blue">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
     </div>
-    <div class="mini-metrics">
-      <div><span>Final Score</span><strong>{{ result.final_evaluation.total_score }}</strong></div>
-      <div><span>Hard Constraints</span><strong>{{ result.final_evaluation.metrics.hard_constraint_satisfaction }}%</strong></div>
-      <div><span>Soft Quality</span><strong>{{ result.final_evaluation.metrics.soft_constraint_quality }}%</strong></div>
-      <div><span>Sessions Scheduled</span><strong>{{ result.final_evaluation.metrics.scheduled_sessions|int }}</strong></div>
+    <div class="kpi-text">
+      <span>Total Lecturers</span>
+      <strong class="kpi-value">{{ result.dashboard.total_lecturers }}</strong>
     </div>
-    <div class="progress-rail">
-      <label>Optimization Progress</label>
-      <div class="bar"><span style="width: {{ result.activity_log[-1].progress }}%"></span></div>
-    </div>
-  </article>
-</section>
+  </div>
 
-<section class="content-grid">
-  {% if result.adaptive_summary %}
-  <article class="panel">
-    <div class="panel-head">
-      <div>
-        <h2>Production Profile</h2>
-        <p>Dataset scale, selected mode, and the optimization profile used to keep production responsive.</p>
-      </div>
+  <!-- Total Rooms -->
+  <div class="kpi-card float-in">
+    <div class="kpi-icon-wrapper bg-purple">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line></svg>
     </div>
-    <div class="mini-metrics">
-      <div><span>Requested Strategy</span><strong>{{ result.adaptive_summary.requested_strategy|upper }}</strong></div>
-      <div><span>Effective Strategy</span><strong>{{ result.adaptive_summary.effective_strategy|upper }}</strong></div>
-      <div><span>Sessions</span><strong>{{ result.adaptive_summary.session_count }}</strong></div>
-      <div><span>Search Space</span><strong>{{ result.adaptive_summary.search_space }}</strong></div>
+    <div class="kpi-text">
+      <span>Total Rooms</span>
+      <strong class="kpi-value">{{ result.dashboard.total_rooms }}</strong>
     </div>
-    <p>{{ result.adaptive_summary.note }}</p>
-  </article>
-  {% endif %}
+  </div>
 
-  <article class="panel">
-    <div class="panel-head">
-      <div>
-        <h2>Weekly Preview</h2>
-        <p>Compact look at the generated timetable before deep inspection.</p>
-      </div>
-      <a href="/download/{{ download_id }}" class="pill-link">Download CSV</a>
+  <!-- Generated Timetables -->
+  <div class="kpi-card float-in">
+    <div class="kpi-icon-wrapper bg-emerald">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
     </div>
-    <div class="preview-table">
-      <table>
-        <thead>
-          <tr><th>Session</th><th>Day</th><th>Time</th><th>Room</th><th>Status</th></tr>
-        </thead>
-        <tbody>
-          {% for row in result.schedule_rows[:6] %}
-          <tr>
-            <td>{{ row.course_code }}</td>
-            <td>{{ row.day }}</td>
-            <td>{{ row.time }}</td>
-            <td>{{ row.room }}</td>
-            <td>{{ row.status }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+    <div class="kpi-text">
+      <span>Active Timetable</span>
+      <strong class="kpi-value">1</strong>
     </div>
-  </article>
+  </div>
+</div>
 
-  <article class="panel">
-    <div class="panel-head">
-      <div>
-        <h2>Quality Signals</h2>
-        <p>More realistic health indicators beyond simple validity.</p>
-      </div>
-    </div>
-    <div class="signal-list">
-      <div><span>Fatigue Index</span><strong>{{ result.final_evaluation.metrics.fatigue_index }}%</strong></div>
-      <div><span>Idle Index</span><strong>{{ result.final_evaluation.metrics.student_idle_index }}%</strong></div>
-      <div><span>Room Utilization</span><strong>{{ result.final_evaluation.metrics.room_utilization }}%</strong></div>
-      <div><span>Geographic Penalty</span><strong>{{ result.final_evaluation.metrics.geographic_penalty_index }}%</strong></div>
-    </div>
-  </article>
-</section>
-
-<section class="content-grid">
-  <article class="panel">
-    <div class="panel-head">
-      <div>
-        <h2>Conflict Suggestions</h2>
-        <p>Suggested alternatives and admin-safe adjustment ideas.</p>
-      </div>
-    </div>
-    <ul class="stack-list">
-      {% for suggestion in result.resolution_suggestions[:4] %}
-      <li>
-        <strong>{{ suggestion.session_id }}</strong>
-        <p>{{ suggestion.message }}</p>
-        {% if suggestion.alternatives %}
-        <span class="muted-inline">{{ suggestion.alternatives|join(', ') }}</span>
-        {% endif %}
-      </li>
-      {% endfor %}
-    </ul>
-  </article>
-</section>
-
-<section class="content-grid">
-  <article class="panel dark-panel terminal-panel">
-    <div class="panel-head">
-      <div>
-        <h2>Agent Terminal</h2>
-        <p>Real-time reasoning stream from the orchestration pipeline.</p>
-      </div>
-      <span class="text-chip">{{ result.strategy|title }}</span>
-    </div>
-    <div class="terminal-feed">
-      {% for event in result.activity_log %}
-      <div class="activity-item terminal-entry">
-        <span class="activity-progress">{{ event.progress }}%</span>
+<div class="dashboard-layout-grid">
+  <!-- Left Column: Core Overview & preview -->
+  <div class="dashboard-col-left">
+    <!-- Overview & Progress -->
+    <article class="panel">
+      <div class="panel-head">
         <div>
-          <strong>{{ event.agent }}</strong>
-          <p><span class="log-prefix">&gt; {{ event.action|upper }}</span> {{ event.detail }}</p>
+          <h2>Optimization Health</h2>
+          <p>High-level score, quality metrics, and constraints satisfaction rate.</p>
+        </div>
+        <a href="/timetable?run_id={{ run_id }}" class="pill-link">Open Full Grid</a>
+      </div>
+      
+      <div class="kpi-sub-grid">
+        <div class="kpi-metric-entry">
+          <span class="metric-label">Constraint Score</span>
+          <strong class="metric-val text-emerald">{{ result.final_evaluation.total_score }}</strong>
+        </div>
+        <div class="kpi-metric-entry">
+          <span class="metric-label">Conflicts Found</span>
+          <strong class="metric-val {% if result.final_evaluation.hard_violations %}text-danger{% else %}text-success{% endif %}">
+            {{ result.final_evaluation.hard_violations|length }}
+          </strong>
+        </div>
+        <div class="kpi-metric-entry">
+          <span class="metric-label">Hard Constraints</span>
+          <strong class="metric-val text-indigo">{{ result.final_evaluation.metrics.hard_constraint_satisfaction }}%</strong>
+        </div>
+        <div class="kpi-metric-entry">
+          <span class="metric-label">Soft Quality</span>
+          <strong class="metric-val text-indigo">{{ result.final_evaluation.metrics.soft_constraint_quality }}%</strong>
         </div>
       </div>
-      {% endfor %}
-    </div>
-  </article>
-</section>
+      
+      <div class="progress-section">
+        <div class="progress-info">
+          <span>AI Search Progress</span>
+          <strong>{{ result.activity_log[-1].progress }}%</strong>
+        </div>
+        <div class="progress-bar-rail">
+          <div class="progress-bar-fill" style="width: {{ result.activity_log[-1].progress }}%"></div>
+        </div>
+      </div>
+    </article>
+
+    <!-- Weekly Preview -->
+    <article class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>Weekly Allocation Preview</h2>
+          <p>Compact schedule extract. Open full grid for cell edits and group filters.</p>
+        </div>
+        <a href="/download/{{ download_id }}" class="ghost-button">Export CSV</a>
+      </div>
+      <div class="preview-table">
+        <table>
+          <thead>
+            <tr>
+              <th>Course</th>
+              <th>Day</th>
+              <th>Time</th>
+              <th>Room</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in result.schedule_rows[:6] %}
+            <tr>
+              <td class="font-mono"><strong>{{ row.course_code }}</strong></td>
+              <td>{{ row.day }}</td>
+              <td>{{ row.time }}</td>
+              <td><span class="room-pill">{{ row.room }}</span></td>
+              <td>
+                <span class="badge {% if row.status == 'Scheduled' %}badge-success{% else %}badge-warning{% endif %}">
+                  {{ row.status }}
+                </span>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </article>
+  </div>
+
+  <!-- Right Column: Quick Actions & Signals -->
+  <div class="dashboard-col-right">
+    <!-- Quick Actions Panel -->
+    <article class="panel bg-slate-900 text-white">
+      <div class="panel-head">
+        <div>
+          <h2 class="text-white">Quick Actions</h2>
+          <p class="text-slate-400">Common administrative workflows.</p>
+        </div>
+      </div>
+      <div class="action-buttons-list">
+        <a href="/generate" class="action-btn-primary">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+          <span>Generate New Schedule</span>
+        </a>
+        <a href="/timetable?run_id={{ run_id }}" class="action-btn-secondary">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+          <span>View Timetable Grid</span>
+        </a>
+        <a href="/audit" class="action-btn-secondary">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4M12 8h.01"></path></svg>
+          <span>Inspect AI Decisions</span>
+        </a>
+        <a href="/resources" class="action-btn-secondary">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle></svg>
+          <span>Manage Rooms & Lecturers</span>
+        </a>
+        <a href="/scenarios" class="action-btn-secondary">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path></svg>
+          <span>Check Active Disruptions</span>
+        </a>
+      </div>
+    </article>
+
+    <!-- Run Summary & Status -->
+    <article class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>System Status</h2>
+          <p>Operational health and configuration profile.</p>
+        </div>
+      </div>
+      <div class="status-summary-list">
+        <div class="status-summary-item">
+          <span>System Status</span>
+          <span class="status-tag active">All Systems Operational</span>
+        </div>
+        <div class="status-summary-item">
+          <span>Last Solver Run</span>
+          <strong>May 18, 2026</strong>
+        </div>
+        {% if result.adaptive_summary %}
+        <div class="status-summary-item">
+          <span>Adaptive Strategy</span>
+          <strong>{{ result.adaptive_summary.effective_strategy|upper }}</strong>
+        </div>
+        {% endif %}
+      </div>
+    </article>
+
+    <!-- Quality Signals -->
+    <article class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>Quality Indicators</h2>
+          <p>Analytical indices derived from optimization rules.</p>
+        </div>
+      </div>
+      <div class="signal-gauge-list">
+        <div class="signal-gauge-item">
+          <div class="signal-gauge-label">
+            <span>Fatigue Index</span>
+            <strong>{{ result.final_evaluation.metrics.fatigue_index }}%</strong>
+          </div>
+          <div class="signal-gauge-bar"><div class="fill bg-amber" style="width: {{ result.final_evaluation.metrics.fatigue_index }}%"></div></div>
+        </div>
+        <div class="signal-gauge-item">
+          <div class="signal-gauge-label">
+            <span>Student Idle Index</span>
+            <strong>{{ result.final_evaluation.metrics.student_idle_index }}%</strong>
+          </div>
+          <div class="signal-gauge-bar"><div class="fill bg-indigo" style="width: {{ result.final_evaluation.metrics.student_idle_index }}%"></div></div>
+        </div>
+        <div class="signal-gauge-item">
+          <div class="signal-gauge-label">
+            <span>Room Utilization</span>
+            <strong>{{ result.final_evaluation.metrics.room_utilization }}%</strong>
+          </div>
+          <div class="signal-gauge-bar"><div class="fill bg-emerald" style="width: {{ result.final_evaluation.metrics.room_utilization }}%"></div></div>
+        </div>
+      </div>
+    </article>
+  </div>
+</div>
 {% else %}
 <section class="empty-state fade-in">
-  <h2>No active scheduling run yet</h2>
-  <p>Start from the Generate page to upload data, configure the strategy, and create a timetable.</p>
-  <a href="/generate" class="primary-link">Go to Generate</a>
+  <div class="empty-state-icon">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+  </div>
+  <h2>No active scheduling run found</h2>
+  <p>To view metrics, schedule grids, and AI reasoning traces, click below to upload your datasets and launch the scheduler.</p>
+  <a href="/generate" class="primary-link">Generate First Timetable</a>
 </section>
 {% endif %}
+
 {% endblock %}

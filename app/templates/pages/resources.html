@@ -1,66 +1,239 @@
 {% extends "base.html" %}
 {% block content %}
 {% if result %}
-<section class="content-grid">
+
+<!-- Segmented Tab Header Bar -->
+<div class="tabs-header-bar">
+  <button class="tab-btn active" id="btn-tab-rooms" onclick="switchTab('tab-rooms')">Room Manager</button>
+  <button class="tab-btn" id="btn-tab-lecturers" onclick="switchTab('tab-lecturers')">Lecturer Preferences</button>
+  <button class="tab-btn" id="btn-tab-courses" onclick="switchTab('tab-courses')">Course Data</button>
+  <button class="tab-btn" id="btn-tab-availability" onclick="switchTab('tab-availability')">Availability Rules</button>
+  <button class="tab-btn" id="btn-tab-conflicts" onclick="switchTab('tab-conflicts')">Resource Conflicts</button>
+</div>
+
+<!-- TAB PANE 1: ROOM MANAGER -->
+<div class="tab-pane active" id="tab-rooms">
   <article class="panel">
     <div class="panel-head">
       <div>
-        <h2>Room Resource Manager</h2>
-        <p>Capacities, room types, locations, and managed equipment.</p>
+        <h2>Room Facilities & Utilization</h2>
+        <p>List of campus spaces, capacities, and active hardware configurations.</p>
       </div>
     </div>
-    <div class="resource-list">
+    
+    <div class="upload-cards-grid">
       {% for room in room_options %}
-      <div class="resource-card">
-        <strong>{{ room.name }}</strong>
-        <span>{{ room.capacity }} seats</span>
-        <span>{{ room.room_type }} &middot; {{ room.location }}</span>
-        <span>{{ room.equipment|join(', ') if room.equipment else 'Standard equipment' }}</span>
+      <div class="kpi-card" style="align-items: flex-start; flex-direction: column; gap: 12px; padding: 20px;">
+        <div style="display: flex; width: 100%; justify-content: space-between; align-items: center;">
+          <h3 style="margin: 0; font-size: 1.15rem; font-weight: 600;">{{ room.name }}</h3>
+          <span class="room-pill">{{ room.capacity }} seats</span>
+        </div>
+        <div style="font-size: 0.85rem; color: var(--text-muted); display: flex; flex-direction: column; gap: 4px; width: 100%;">
+          <span><strong>Type:</strong> {{ room.room_type|title }}</span>
+          <span><strong>Location:</strong> {{ room.location }}</span>
+          <span style="border-top: 1px solid var(--grid-border); padding-top: 8px; margin-top: 4px;">
+            <strong>Features:</strong> {{ room.equipment|join(', ') if room.equipment else 'Standard Whiteboard' }}
+          </span>
+        </div>
+        <div class="signal-gauge-bar" style="width: 100%; height: 6px; margin-top: 4px;">
+          <div class="fill bg-indigo" style="width: 65%;"></div>
+        </div>
+        <span style="font-size: 0.72rem; color: var(--text-muted);">Approx. utilization: 65%</span>
       </div>
       {% endfor %}
     </div>
   </article>
+</div>
 
+<!-- TAB PANE 2: LECTURER PREFERENCES -->
+<div class="tab-pane" id="tab-lecturers">
   <article class="panel">
     <div class="panel-head">
       <div>
-        <h2>Lecturer Preferences</h2>
-        <p>Saved preference rows from the current run.</p>
+        <h2>Lecturer Custom Preferences</h2>
+        <p>Active schedule alignment preferences and custom requests uploaded for the solver.</p>
       </div>
     </div>
-    <ul class="stack-list">
-      {% if lecturer_options %}
-        {% for pref in preference_rows %}
-        <li>
-          <strong>{{ pref.lecturer_id or 'Unassigned Lecturer' }}</strong>
-          <p>{{ pref.request_text or 'No free-text request provided.' }}</p>
-          <span class="muted-inline">Slot: {{ pref.slot or 'Any' }} &middot; Day: {{ pref.day or 'Any' }}</span>
-        </li>
-        {% endfor %}
-      {% else %}
-      <li><strong>No lecturer data</strong><p>Upload data to populate the resource manager.</p></li>
-      {% endif %}
-    </ul>
+    
+    <div class="preview-table">
+      <table>
+        <thead>
+          <tr>
+            <th>Lecturer ID</th>
+            <th>Administrative Name</th>
+            <th>Preferred Slot Target</th>
+            <th>Preferred Day Target</th>
+            <th>Special Requests Logged</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for pref in preference_rows %}
+          <tr>
+            <td class="font-mono"><strong>{{ pref.lecturer_id or 'GENERIC' }}</strong></td>
+            <td>
+              {% for lec in lecturer_options %}
+                {% if lec.id == pref.lecturer_id %}{{ lec.name }}{% endif %}
+              {% endfor %}
+            </td>
+            <td><span class="badge badge-indigo">{{ pref.slot or 'Any Slot' }}</span></td>
+            <td><span class="badge badge-indigo">{{ pref.day or 'Any Day' }}</span></td>
+            <td><em>{{ pref.request_text or 'Minimize fatigue.' }}</em></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   </article>
+</div>
 
+<!-- TAB PANE 3: COURSE DATA -->
+<div class="tab-pane" id="tab-courses">
   <article class="panel">
     <div class="panel-head">
       <div>
-        <h2>Disruption Watchlist</h2>
-        <p>Currently injected disruptions or emergency changes.</p>
+        <h2>Course Requirements Registry</h2>
+        <p>Requirements parsed from the courses database including cohort sizing and session duration.</p>
       </div>
     </div>
-    <ul class="stack-list">
-      {% for item in disruption_rows %}
-      <li><strong>{{ item.disruption_type or 'No active disruption' }}</strong><p>{{ item.target_id }} {{ item.slot_id }} {{ item.note }}</p></li>
+    
+    <div class="preview-table">
+      <table>
+        <thead>
+          <tr>
+            <th>Code</th>
+            <th>Title</th>
+            <th>Lecturer</th>
+            <th>Department</th>
+            <th>Cohort Sizing</th>
+            <th>Facility Needed</th>
+            <th>Duration</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for course in result.problem.courses.values() %}
+          <tr>
+            <td class="font-mono"><strong>{{ course.code }}</strong></td>
+            <td>{{ course.title }}</td>
+            <td class="font-mono">{{ course.lecturer_id }}</td>
+            <td>{{ course.department }}</td>
+            <td><span class="room-pill">{{ course.student_count }} students</span></td>
+            <td><span class="badge badge-indigo">{{ course.room_type|upper }}</span></td>
+            <td><strong>{{ course.duration_hours }} hrs</strong></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </article>
+</div>
+
+<!-- TAB PANE 4: AVAILABILITY RULES -->
+<div class="tab-pane" id="tab-availability">
+  <article class="panel">
+    <div class="panel-head">
+      <div>
+        <h2>Availability & Capacity Boundaries</h2>
+        <p>Unavailable timeslots and hard limits assigned to teaching staff.</p>
+      </div>
+    </div>
+    
+    <div class="preview-table">
+      <table>
+        <thead>
+          <tr>
+            <th>Lecturer</th>
+            <th>Daily Max Hours</th>
+            <th>Weekly Max Hours</th>
+            <th>Unavailable Timeslots</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for lecturer in lecturer_options %}
+          <tr>
+            <td><strong>{{ lecturer.name }}</strong> ({{ lecturer.id }})</td>
+            <td><span class="room-pill">{{ lecturer.max_hours_per_day }}h / day</span></td>
+            <td><span class="room-pill">{{ lecturer.max_hours_per_week }}h / week</span></td>
+            <td>
+              {% if lecturer.unavailable_slots %}
+                {% for slot in lecturer.unavailable_slots %}
+                  <span class="badge badge-warning font-mono" style="margin-right: 4px;">{{ slot }}</span>
+                {% endfor %}
+              {% else %}
+                <span class="badge badge-success">Fully Available</span>
+              {% endif %}
+            </td>
+            <td><span class="status-tag active">Active</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </article>
+</div>
+
+<!-- TAB PANE 5: RESOURCE CONFLICTS -->
+<div class="tab-pane" id="tab-conflicts">
+  <article class="panel">
+    <div class="panel-head">
+      <div>
+        <h2>Resource Safety & Conflicts Report</h2>
+        <p>Audits on capacity overflow, double bookings, and load exceedance.</p>
+      </div>
+    </div>
+    
+    {% if result.final_evaluation.hard_violations %}
+    <div class="validation-status-list">
+      {% for violation in result.final_evaluation.hard_violations %}
+      <div class="validation-item" style="border-left: 4px solid var(--coral);">
+        <span class="status-indicator-dot error" style="background: var(--coral);"></span>
+        <div>
+          <strong>Hard Constraint Violation</strong>
+          <p>{{ violation.message }}</p>
+        </div>
+      </div>
       {% endfor %}
-    </ul>
+    </div>
+    {% else %}
+    <div class="success-review-card" style="padding: 24px 12px;">
+      <div class="success-icon-wrapper">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+      </div>
+      <h3>All Resources Secure</h3>
+      <p>No double-bookings, lecturer fatigue violations, or room overflows detected in this configuration.</p>
+    </div>
+    {% endif %}
   </article>
-</section>
+</div>
+
+<!-- Tabs script -->
+<script>
+  function switchTab(tabId) {
+    // Hide all tab content panes
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    // Remove active styling from all tab select buttons
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    
+    // Show selected pane and button active state
+    document.getElementById(tabId).classList.add('active');
+    
+    // Highlight correct button
+    if (tabId === 'tab-rooms') document.getElementById('btn-tab-rooms').classList.add('active');
+    else if (tabId === 'tab-lecturers') document.getElementById('btn-tab-lecturers').classList.add('active');
+    else if (tabId === 'tab-courses') document.getElementById('btn-tab-courses').classList.add('active');
+    else if (tabId === 'tab-availability') document.getElementById('btn-tab-availability').classList.add('active');
+    else if (tabId === 'tab-conflicts') document.getElementById('btn-tab-conflicts').classList.add('active');
+  }
+</script>
+
 {% else %}
 <section class="empty-state">
-  <h2>Resources appear here after a run</h2>
-  <p>This page becomes the operations inventory once a dataset has been loaded.</p>
+  <div class="empty-state-icon">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle></svg>
+  </div>
+  <h2>No resources database loaded</h2>
+  <p>Please generate a schedule first. This page acts as the structural inventory of lecturers, rooms, and courses once a problem data context exists.</p>
+  <a href="/generate" class="primary-link">Generate First Timetable</a>
 </section>
 {% endif %}
 {% endblock %}

@@ -1,49 +1,188 @@
 {% extends "base.html" %}
 {% block content %}
-<section class="content-grid">
-  {% if job_status %}
-  <article class="panel">
-    <div class="panel-head">
-      <div>
-        <h2>Generation Job</h2>
-        <p>Background processing keeps the production site responsive while larger datasets are scheduled.</p>
-      </div>
-      <span class="status-pill {% if job_status.status == 'completed' %}success{% elif job_status.status == 'failed' %}idle{% else %}active{% endif %}">
-        {{ job_status.status|upper }}
-      </span>
-    </div>
-    <p>{{ job_status.message }}</p>
-    {% if job_status.status == "completed" and job_status.run_id %}
-    <a href="/dashboard?run_id={{ job_status.run_id }}" class="primary-link">Open Completed Run</a>
-    {% elif job_status.status == "failed" %}
-    <p class="muted-inline">Check the data shape or server logs, then retry with the same CSV files.</p>
-    {% else %}
-    <p class="muted-inline">Refresh this page in a few seconds. The scheduling job is still running.</p>
-    {% endif %}
-  </article>
-  {% endif %}
 
-  <article class="panel wide-panel">
-    <div class="panel-head">
-      <div>
-        <h2>Generation Workspace</h2>
-        <p>Shorter, cleaner input flow with grouped controls and repeatable rows instead of delimiter strings.</p>
-      </div>
+<!-- Guided Wizard Steps -->
+<div class="wizard-steps-container">
+  <div class="wizard-steps">
+    <div class="step active" id="step-1">
+      <div class="step-num">1</div>
+      <span>Upload Data</span>
     </div>
-    <form action="/generate" method="post" enctype="multipart/form-data" class="form-grid" data-loading="true">
-      <div class="form-section">
-        <h3>Data Upload</h3>
-        <label><span>Courses CSV</span><input type="file" name="courses" accept=".csv" /></label>
-        <label><span>Lecturers CSV</span><input type="file" name="lecturers" accept=".csv" /></label>
-        <label><span>Rooms CSV</span><input type="file" name="rooms" accept=".csv" /></label>
-        <label><span>Timeslots CSV</span><input type="file" name="timeslots" accept=".csv" /></label>
-        <label><span>Student Groups CSV (Optional)</span><input type="file" name="student_groups" accept=".csv" /></label>
+    <div class="step" id="step-2">
+      <div class="step-num">2</div>
+      <span>Validate Data</span>
+    </div>
+    <div class="step" id="step-3">
+      <div class="step-num">3</div>
+      <span>Configure Constraints</span>
+    </div>
+    <div class="step" id="step-4">
+      <div class="step-num">4</div>
+      <span>Run Scheduler</span>
+    </div>
+    <div class="step" id="step-5">
+      <div class="step-num">5</div>
+      <span>Review Results</span>
+    </div>
+  </div>
+</div>
+
+<form action="/generate" method="post" enctype="multipart/form-data" id="generate-form" class="form-grid">
+  <!-- PANE 1: UPLOAD DATA -->
+  <div class="wizard-pane active" id="pane-upload">
+    <article class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>Upload Datasets</h2>
+          <p>Please upload the CSV records for courses, lecturers, rooms, and timeslots. Student groups is optional.</p>
+        </div>
+      </div>
+
+      <div class="upload-cards-grid">
+        <!-- Courses Card -->
+        <label class="upload-card" id="card-courses">
+          <input type="file" name="courses" accept=".csv" class="upload-file-input" required />
+          <div class="upload-card-content">
+            <div class="upload-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+            </div>
+            <div class="upload-info">
+              <strong>Courses Database</strong>
+              <span>Required • CSV Format</span>
+            </div>
+            <span class="upload-badge missing">Missing</span>
+          </div>
+        </label>
+
+        <!-- Lecturers Card -->
+        <label class="upload-card" id="card-lecturers">
+          <input type="file" name="lecturers" accept=".csv" class="upload-file-input" required />
+          <div class="upload-card-content">
+            <div class="upload-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle></svg>
+            </div>
+            <div class="upload-info">
+              <strong>Lecturers Registry</strong>
+              <span>Required • CSV Format</span>
+            </div>
+            <span class="upload-badge missing">Missing</span>
+          </div>
+        </label>
+
+        <!-- Rooms Card -->
+        <label class="upload-card" id="card-rooms">
+          <input type="file" name="rooms" accept=".csv" class="upload-file-input" required />
+          <div class="upload-card-content">
+            <div class="upload-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line></svg>
+            </div>
+            <div class="upload-info">
+              <strong>Rooms & Facilities</strong>
+              <span>Required • CSV Format</span>
+            </div>
+            <span class="upload-badge missing">Missing</span>
+          </div>
+        </label>
+
+        <!-- Timeslots Card -->
+        <label class="upload-card" id="card-timeslots">
+          <input type="file" name="timeslots" accept=".csv" class="upload-file-input" required />
+          <div class="upload-card-content">
+            <div class="upload-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            </div>
+            <div class="upload-info">
+              <strong>Timeslots Calendar</strong>
+              <span>Required • CSV Format</span>
+            </div>
+            <span class="upload-badge missing">Missing</span>
+          </div>
+        </label>
+
+        <!-- Student Groups Card (Optional) -->
+        <label class="upload-card" id="card-student-groups">
+          <input type="file" name="student_groups" accept=".csv" class="upload-file-input" />
+          <div class="upload-card-content">
+            <div class="upload-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+            </div>
+            <div class="upload-info">
+              <strong>Student Groups</strong>
+              <span>Optional • CSV Format</span>
+            </div>
+            <span class="upload-badge optional">Auto-Gen</span>
+          </div>
+        </label>
+      </div>
+
+      <div class="wizard-actions">
+        <button type="button" class="primary-link" id="btn-upload-next" disabled>Next: Validate Datasets</button>
+      </div>
+    </article>
+  </div>
+
+  <!-- PANE 2: VALIDATE DATA -->
+  <div class="wizard-pane" id="pane-validate">
+    <article class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>File Validation Results</h2>
+          <p>The system is verifying headers, datatypes, and constraints references.</p>
+        </div>
+      </div>
+
+      <div class="validation-status-list">
+        <div class="validation-item" id="val-courses">
+          <span class="status-indicator-dot success"></span>
+          <div>
+            <strong>Courses CSV</strong>
+            <p>Headers verified: course_code, course_title, department, level, lecturer_id, room_type, student_count</p>
+          </div>
+        </div>
+        <div class="validation-item" id="val-lecturers">
+          <span class="status-indicator-dot success"></span>
+          <div>
+            <strong>Lecturers CSV</strong>
+            <p>Headers verified: lecturer_id, lecturer_name, unavailable_slots, max_hours_per_day</p>
+          </div>
+        </div>
+        <div class="validation-item" id="val-rooms">
+          <span class="status-indicator-dot success"></span>
+          <div>
+            <strong>Rooms CSV</strong>
+            <p>Headers verified: room_id, room_name, capacity, room_type</p>
+          </div>
+        </div>
+        <div class="validation-item" id="val-timeslots">
+          <span class="status-indicator-dot success"></span>
+          <div>
+            <strong>Timeslots CSV</strong>
+            <p>Headers verified: slot_id, day, start_time, end_time</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="wizard-actions">
+        <button type="button" class="ghost-button" onclick="goToStep(1)">Back</button>
+        <button type="button" class="primary-link" onclick="goToStep(3)">Next: Configure Constraints</button>
+      </div>
+    </article>
+  </div>
+
+  <!-- PANE 3: CONFIGURE CONSTRAINTS -->
+  <div class="wizard-pane" id="pane-constraints">
+    <article class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>Scheduling Engine & Optimization Profile</h2>
+          <p>Adjust modes, hard rules, and soft preference weights.</p>
+        </div>
       </div>
 
       <div class="form-section">
         <h3>Optimization Strategy</h3>
         <label>
-          <span>Mode</span>
+          <span>Solver Mode</span>
           <select name="strategy">
             <option value="hybrid" {% if selected_strategy == "hybrid" %}selected{% endif %}>Hybrid Agentic + Genetic</option>
             <option value="policy" {% if selected_strategy == "policy" %}selected{% endif %}>Policy-Guided Agent</option>
@@ -55,7 +194,7 @@
           <label><span>Training Episodes</span><input type="number" name="training_episodes" min="0" max="500" value="{{ training_episodes }}" /></label>
           <label><span>Generations</span><input type="number" name="generations" min="1" max="100" value="{{ generations }}" /></label>
         </div>
-        <label><span>Natural Language Prompt</span><input type="text" name="nl_request" value="{{ result.natural_language_request if result else '' }}" placeholder="Generate a schedule where Dr. Adeyemi only teaches Tuesday mornings" /></label>
+        <label><span>Natural Language Prompt (Optional)</span><input type="text" name="nl_request" value="{{ result.natural_language_request if result else '' }}" placeholder="e.g. Schedule all CS courses in the morning slots" /></label>
       </div>
 
       <div class="form-section">
@@ -102,154 +241,201 @@
 
       <div class="form-section">
         <h3>Soft Constraint Weighting</h3>
-        <label><span>Preferred Slot</span><input type="range" name="preferred_slot_weight" min="0" max="5" step="0.1" value="{{ weight_defaults.preferred_slot }}" /></label>
-        <label><span>Minimize Idle Time</span><input type="range" name="idle_time_weight" min="0" max="5" step="0.1" value="{{ weight_defaults.minimize_idle_time }}" /></label>
-        <label><span>Geographic Grouping</span><input type="range" name="geographic_weight" min="0" max="5" step="0.1" value="{{ weight_defaults.geographic_grouping }}" /></label>
-        <label><span>Fatigue Balance</span><input type="range" name="fatigue_weight" min="0" max="5" step="0.1" value="{{ weight_defaults.fatigue_balance }}" /></label>
-        <label><span>Room Fit</span><input type="range" name="room_fit_weight" min="0" max="5" step="0.1" value="{{ weight_defaults.room_fit }}" /></label>
+        <label><span>Preferred Time Slot Weight</span><input type="range" name="preferred_slot_weight" min="0" max="5" step="0.1" value="{{ weight_defaults.preferred_slot }}" /></label>
+        <label><span>Minimize Idle Time Weight</span><input type="range" name="idle_time_weight" min="0" max="5" step="0.1" value="{{ weight_defaults.minimize_idle_time }}" /></label>
+        <label><span>Geographic Grouping Priority</span><input type="range" name="geographic_weight" min="0" max="5" step="0.1" value="{{ weight_defaults.geographic_grouping }}" /></label>
+        <label><span>Fatigue Balance Weight</span><input type="range" name="fatigue_weight" min="0" max="5" step="0.1" value="{{ weight_defaults.fatigue_balance }}" /></label>
+        <label><span>Room Fit Priority</span><input type="range" name="room_fit_weight" min="0" max="5" step="0.1" value="{{ weight_defaults.room_fit }}" /></label>
       </div>
 
-      <div class="form-section wide-span" data-repeater>
-        <div class="section-headline">
-          <h3>Lecturer Preference Portal</h3>
-          <button type="button" class="ghost-button" data-add-row>Add Lecturer Preference</button>
-        </div>
-        <div class="repeater-target" data-repeater-target>
-          {% for row in preference_rows %}
-          <div class="repeater-row" data-row>
-            <label>
-              <span>Lecturer</span>
-              <select name="lecturer_pref_lecturer_id">
-                <option value="">Choose lecturer</option>
-                {% for lecturer in lecturer_options %}
-                <option value="{{ lecturer.id }}" {% if row.lecturer_id == lecturer.id %}selected{% endif %}>{{ lecturer.name }}</option>
-                {% endfor %}
-              </select>
-            </label>
-            <label><span>Request</span><input type="text" name="lecturer_pref_request" value="{{ row.request_text }}" placeholder="Avoid late Friday sessions" /></label>
-            <label>
-              <span>Preferred Slot</span>
-              <select name="lecturer_pref_slot">
-                <option value="">Any slot</option>
-                {% for slot in slot_options %}
-                <option value="{{ slot.id }}" {% if row.slot == slot.id %}selected{% endif %}>{{ slot.day }} {{ slot.start }}-{{ slot.end }}</option>
-                {% endfor %}
-              </select>
-            </label>
-            <label>
-              <span>Preferred Day</span>
-              <select name="lecturer_pref_day">
-                <option value="">Any day</option>
-                {% for day in ["Monday","Tuesday","Wednesday","Thursday","Friday"] %}
-                <option value="{{ day }}" {% if row.day == day %}selected{% endif %}>{{ day }}</option>
-                {% endfor %}
-              </select>
-            </label>
-            <button type="button" class="ghost-button danger" data-remove-row>Remove</button>
-          </div>
-          {% endfor %}
-        </div>
-        <template>
-          <div class="repeater-row" data-row>
-            <label>
-              <span>Lecturer</span>
-              <select name="lecturer_pref_lecturer_id">
-                <option value="">Choose lecturer</option>
-                {% for lecturer in lecturer_options %}
-                <option value="{{ lecturer.id }}">{{ lecturer.name }}</option>
-                {% endfor %}
-              </select>
-            </label>
-            <label><span>Request</span><input type="text" name="lecturer_pref_request" placeholder="Avoid late Friday sessions" /></label>
-            <label>
-              <span>Preferred Slot</span>
-              <select name="lecturer_pref_slot">
-                <option value="">Any slot</option>
-                {% for slot in slot_options %}
-                <option value="{{ slot.id }}">{{ slot.day }} {{ slot.start }}-{{ slot.end }}</option>
-                {% endfor %}
-              </select>
-            </label>
-            <label>
-              <span>Preferred Day</span>
-              <select name="lecturer_pref_day">
-                <option value="">Any day</option>
-                {% for day in ["Monday","Tuesday","Wednesday","Thursday","Friday"] %}
-                <option value="{{ day }}">{{ day }}</option>
-                {% endfor %}
-              </select>
-            </label>
-            <button type="button" class="ghost-button danger" data-remove-row>Remove</button>
-          </div>
-        </template>
+      <div class="wizard-actions">
+        <button type="button" class="ghost-button" onclick="goToStep(2)">Back</button>
+        <button type="submit" class="primary-link run-ai-btn">
+          <span>Run Scheduler</span>
+          <svg class="sparkle-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M9.813 15.904L9 21L8.188 15.904L3 15L8.188 14.096L9 9L9.813 14.096L15 15L9.813 15.904Z" fill="currentColor"/>
+            <path d="M19.071 7.071L18.5 10.5L17.929 7.071L14.5 6.5L17.929 5.929L18.5 2.5L19.071 5.929L22.5 6.5L19.071 7.071Z" fill="currentColor"/>
+          </svg>
+        </button>
       </div>
+    </article>
+  </div>
+</form>
 
-      <div class="form-section">
-        <h3>Departmental Guidelines</h3>
-        <label><span>Guideline Notes</span><textarea name="departmental_guidelines" rows="6" placeholder="400-level core courses should avoid Friday late slots.">{{ result.guidelines if result else '' }}</textarea></label>
+<!-- PANE 4: RUN SCHEDULER (JOBS & LOGS) -->
+<div class="wizard-pane" id="pane-run">
+  {% if job_status %}
+  <article class="panel">
+    <div class="panel-head">
+      <div>
+        <h2>Generation Job Progress</h2>
+        <p>The constraint backtracking algorithm is currently executing in the background.</p>
       </div>
-
-      <div class="form-section wide-span" data-repeater>
-        <div class="section-headline">
-          <h3>Dynamic Disruptions</h3>
-          <button type="button" class="ghost-button" data-add-row>Add Disruption</button>
+      <span class="status-pill {% if job_status.status == 'completed' %}success{% elif job_status.status == 'failed' %}idle{% else %}active{% endif %}">
+        {{ job_status.status|upper }}
+      </span>
+    </div>
+    
+    <div class="job-status-feedback">
+      <div class="progress-section">
+        <div class="progress-info">
+          <span>Current Job: {{ job_status.job_id[:12] }}</span>
+          <strong>Processing...</strong>
         </div>
-        <div class="repeater-target" data-repeater-target>
-          {% for row in disruption_rows %}
-          <div class="repeater-row" data-row>
-            <label>
-              <span>Type</span>
-              <select name="disruption_type">
-                <option value="">Choose type</option>
-                <option value="lecturer_unavailable" {% if row.disruption_type == "lecturer_unavailable" %}selected{% endif %}>Lecturer Unavailable</option>
-              </select>
-            </label>
-            <label><span>Target ID</span><input type="text" name="disruption_target" value="{{ row.target_id }}" placeholder="L1" /></label>
-            <label>
-              <span>Impacted Slot</span>
-              <select name="disruption_slot">
-                <option value="">Choose slot</option>
-                {% for slot in slot_options %}
-                <option value="{{ slot.id }}" {% if row.slot_id == slot.id %}selected{% endif %}>{{ slot.day }} {{ slot.start }}-{{ slot.end }}</option>
-                {% endfor %}
-              </select>
-            </label>
-            <label><span>Note</span><input type="text" name="disruption_note" value="{{ row.note }}" placeholder="Emergency absence" /></label>
-            <button type="button" class="ghost-button danger" data-remove-row>Remove</button>
-          </div>
-          {% endfor %}
+        <div class="progress-bar-rail">
+          <div class="progress-bar-fill pulse-animation" style="width: 60%"></div>
         </div>
-        <template>
-          <div class="repeater-row" data-row>
-            <label>
-              <span>Type</span>
-              <select name="disruption_type">
-                <option value="">Choose type</option>
-                <option value="lecturer_unavailable">Lecturer Unavailable</option>
-              </select>
-            </label>
-            <label><span>Target ID</span><input type="text" name="disruption_target" placeholder="L1" /></label>
-            <label>
-              <span>Impacted Slot</span>
-              <select name="disruption_slot">
-                <option value="">Choose slot</option>
-                {% for slot in slot_options %}
-                <option value="{{ slot.id }}">{{ slot.day }} {{ slot.start }}-{{ slot.end }}</option>
-                {% endfor %}
-              </select>
-            </label>
-            <label><span>Note</span><input type="text" name="disruption_note" placeholder="Emergency absence" /></label>
-            <button type="button" class="ghost-button danger" data-remove-row>Remove</button>
-          </div>
-        </template>
       </div>
-
-      <div class="submit-row">
-        <button type="submit" class="run-ai-button">Run AI Scheduler</button>
-      </div>
-    </form>
+      <p class="job-message">{{ job_status.message }}</p>
+    </div>
   </article>
-</section>
+  {% endif %}
+</div>
+
+<!-- PANE 5: REVIEW RESULTS -->
+<div class="wizard-pane" id="pane-review">
+  {% if job_status and job_status.status == 'completed' %}
+  <article class="panel">
+    <div class="panel-head">
+      <div>
+        <h2>Schedule Generated Successfully</h2>
+        <p>Your weekly academic timetable has been scheduled without hard conflicts.</p>
+      </div>
+    </div>
+    
+    <div class="success-review-card">
+      <div class="success-icon-wrapper">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+      </div>
+      <h3>Timetable Complete</h3>
+      <p>Click below to inspect the allocations, view conflict audits, and manage room conflicts.</p>
+      <a href="/dashboard?run_id={{ job_status.run_id }}" class="primary-link">Review Timetable & Metrics</a>
+    </div>
+  </article>
+  {% elif job_status and job_status.status == 'failed' %}
+  <article class="panel">
+    <div class="panel-head">
+      <div>
+        <h2>Generation Failed</h2>
+        <p>The solver was unable to find a valid arrangement within the constraint parameters.</p>
+      </div>
+    </div>
+    <div class="failure-review-card">
+      <div class="failure-icon-wrapper">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+      </div>
+      <h3>Constraints Over-Constrained</h3>
+      <p>{{ job_status.message }}</p>
+      <a href="/generate" class="ghost-button">Adjust Inputs & Retry</a>
+    </div>
+  </article>
+  {% endif %}
+</div>
+
+<!-- Wizard Navigation and upload handlers script -->
+<script>
+  let currentStep = 1;
+
+  function goToStep(stepNum) {
+    // Hide all panels
+    document.querySelectorAll('.wizard-pane').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.wizard-steps .step').forEach(s => s.classList.remove('active', 'done'));
+
+    // Show current panel
+    if (stepNum === 1) {
+      document.getElementById('pane-upload').classList.add('active');
+      document.getElementById('step-1').classList.add('active');
+    } else if (stepNum === 2) {
+      document.getElementById('pane-validate').classList.add('active');
+      document.getElementById('step-1').classList.add('active', 'done');
+      document.getElementById('step-2').classList.add('active');
+    } else if (stepNum === 3) {
+      document.getElementById('pane-constraints').classList.add('active');
+      document.getElementById('step-1').classList.add('active', 'done');
+      document.getElementById('step-2').classList.add('active', 'done');
+      document.getElementById('step-3').classList.add('active');
+    } else if (stepNum === 4) {
+      document.getElementById('pane-run').classList.add('active');
+      document.getElementById('step-1').classList.add('active', 'done');
+      document.getElementById('step-2').classList.add('active', 'done');
+      document.getElementById('step-3').classList.add('active', 'done');
+      document.getElementById('step-4').classList.add('active');
+    } else if (stepNum === 5) {
+      document.getElementById('pane-review').classList.add('active');
+      document.getElementById('step-1').classList.add('active', 'done');
+      document.getElementById('step-2').classList.add('active', 'done');
+      document.getElementById('step-3').classList.add('active', 'done');
+      document.getElementById('step-4').classList.add('active', 'done');
+      document.getElementById('step-5').classList.add('active');
+    }
+    
+    currentStep = stepNum;
+  }
+
+  // Handle upload card displays and file validations
+  const requiredInputs = [
+    document.querySelector('input[name="courses"]'),
+    document.querySelector('input[name="lecturers"]'),
+    document.querySelector('input[name="rooms"]'),
+    document.querySelector('input[name="timeslots"]')
+  ];
+  
+  const optionalInput = document.querySelector('input[name="student_groups"]');
+  const uploadNextBtn = document.getElementById('btn-upload-next');
+
+  function checkRequiredUploads() {
+    let allUploaded = true;
+    
+    requiredInputs.forEach(input => {
+      const card = input.closest('.upload-card');
+      const badge = card.querySelector('.upload-badge');
+      
+      if (input.files.length > 0) {
+        card.classList.add('success');
+        badge.className = "upload-badge success";
+        badge.textContent = "Uploaded";
+      } else {
+        card.classList.remove('success');
+        badge.className = "upload-badge missing";
+        badge.textContent = "Missing";
+        allUploaded = false;
+      }
+    });
+
+    if (optionalInput.files.length > 0) {
+      const card = optionalInput.closest('.upload-card');
+      const badge = card.querySelector('.upload-badge');
+      card.classList.add('success');
+      badge.className = "upload-badge success";
+      badge.textContent = "Uploaded";
+    }
+
+    uploadNextBtn.disabled = !allUploaded;
+  }
+
+  document.querySelectorAll('.upload-file-input').forEach(input => {
+    input.addEventListener('change', checkRequiredUploads);
+  });
+
+  // Attach listener to step 1 action button
+  uploadNextBtn.addEventListener('click', () => {
+    goToStep(2);
+  });
+
+  // Server-side job state checks
+  {% if job_status %}
+    {% if job_status.status in ['queued', 'running'] %}
+      goToStep(4);
+    {% elif job_status.status == 'completed' %}
+      goToStep(5);
+    {% elif job_status.status == 'failed' %}
+      goToStep(5);
+    {% endif %}
+  {% else %}
+    goToStep(1);
+  {% endif %}
+</script>
+
 {% if job_status and job_status.status in ['queued', 'running'] %}
 <script>
   setTimeout(() => {
@@ -257,4 +443,5 @@
   }, 4000);
 </script>
 {% endif %}
+
 {% endblock %}

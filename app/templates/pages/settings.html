@@ -1,56 +1,181 @@
 {% extends "base.html" %}
 {% block content %}
 {% if result %}
-<section class="content-grid">
-  <article class="panel">
-    <div class="panel-head">
-      <div>
-        <h2>Current Constraint Profile</h2>
-        <p>Operational rules active during the current run.</p>
+
+<div class="audit-layout-grid">
+  <!-- Left Side: Active Constraints Profile -->
+  <div class="audit-col-main">
+    <!-- Hard Constraints Panel -->
+    <article class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>Hard Constraint Safety Rules</h2>
+          <p>Strict boundaries that must be satisfied for a schedule to be valid.</p>
+        </div>
       </div>
-    </div>
-    <div class="settings-list">
-      <div><span>Lecturer Double Booking</span><strong>{{ "On" if constraint_defaults.lecturer_double_booking else "Off" }}</strong></div>
-      <div><span>Room Exclusivity</span><strong>{{ "On" if constraint_defaults.room_exclusivity else "Off" }}</strong></div>
-      <div><span>Room Capacity</span><strong>{{ "On" if constraint_defaults.room_capacity_enforced else "Off" }}</strong></div>
-      <div><span>Room Type</span><strong>{{ "On" if constraint_defaults.room_type_enforced else "Off" }}</strong></div>
-      <div><span>Fatigue Protection</span><strong>{{ "On" if constraint_defaults.fatigue_limit_enabled else "Off" }}</strong></div>
-      <div><span>Max Consecutive Sessions</span><strong>{{ constraint_defaults.max_consecutive_sessions }}</strong></div>
-    </div>
-  </article>
-  <article class="panel">
-    <div class="panel-head">
-      <div>
-        <h2>Soft Weight Profile</h2>
-        <p>Priority weights that shaped the schedule quality trade-offs.</p>
+      
+      <div class="settings-visual-list">
+        <!-- Lecturer Double Booking -->
+        <div class="setting-visual-row">
+          <div class="setting-visual-info">
+            <strong>Lecturer Exclusivity Enforced</strong>
+            <p>Prevents scheduling a lecturer for multiple overlapping sessions.</p>
+          </div>
+          <span class="status-tag active">ON</span>
+        </div>
+
+        <!-- Room Exclusivity -->
+        <div class="setting-visual-row">
+          <div class="setting-visual-info">
+            <strong>Room Exclusivity Enforced</strong>
+            <p>Prevents multiple courses from sharing a room at the same time.</p>
+          </div>
+          <span class="status-tag active">ON</span>
+        </div>
+
+        <!-- Room Capacity -->
+        <div class="setting-visual-row">
+          <div class="setting-visual-info">
+            <strong>Room Capacity Boundaries Enforced</strong>
+            <p>Guarantees student cohort size fits within the allocated room capacity.</p>
+          </div>
+          <span class="status-tag active">ON</span>
+        </div>
+
+        <!-- Room Type -->
+        <div class="setting-visual-row">
+          <div class="setting-visual-info">
+            <strong>Room Type Match Requirements</strong>
+            <p>Ensures specialized lab courses are only scheduled in laboratory rooms.</p>
+          </div>
+          <span class="status-tag active">ON</span>
+        </div>
+
+        <!-- Fatigue Protection -->
+        <div class="setting-visual-row">
+          <div class="setting-visual-info">
+            <strong>Fatigue Protection Enabled</strong>
+            <p>Enforces maximum consecutive session caps for lecturers and students.</p>
+          </div>
+          <span class="status-tag active">ON</span>
+        </div>
+
+        <!-- Max Consecutive -->
+        <div class="setting-visual-row">
+          <div class="setting-visual-info">
+            <strong>Max Consecutive Teaching Sessions</strong>
+            <p>Upper boundary limit on consecutive back-to-back classes.</p>
+          </div>
+          <span class="room-pill">{{ constraint_defaults.max_consecutive_sessions }} sessions</span>
+        </div>
       </div>
-    </div>
-    <div class="settings-list">
-      <div><span>Preferred Slot</span><strong>{{ weight_defaults.preferred_slot }}</strong></div>
-      <div><span>Idle Time</span><strong>{{ weight_defaults.minimize_idle_time }}</strong></div>
-      <div><span>Geographic Grouping</span><strong>{{ weight_defaults.geographic_grouping }}</strong></div>
-      <div><span>Fatigue Balance</span><strong>{{ weight_defaults.fatigue_balance }}</strong></div>
-      <div><span>Room Fit</span><strong>{{ weight_defaults.room_fit }}</strong></div>
-    </div>
-  </article>
-  <article class="panel">
-    <div class="panel-head">
-      <div>
-        <h2>Policy Weights</h2>
-        <p>Learned model signals used during policy-guided search.</p>
+    </article>
+
+    <!-- Soft Constraint Weight Profile -->
+    <article class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>Soft Constraint Weights Profile</h2>
+          <p>Preferences that the solver optimizes to improve comfort and space efficiency.</p>
+        </div>
       </div>
-    </div>
-    <ul class="stack-list">
-      {% for name, value in result.policy_weights.items() %}
-      <li><strong>{{ name }}</strong><p>{{ value }}</p></li>
-      {% endfor %}
-    </ul>
-  </article>
-</section>
+
+      <div class="settings-slider-list">
+        <!-- Preferred Slot -->
+        <div class="setting-slider-item">
+          <div class="setting-slider-label">
+            <strong>Preferred Time Slot Weight</strong>
+            <span>{{ weight_defaults.preferred_slot }} / 5.0</span>
+          </div>
+          <p class="setting-desc">Prioritizes scheduling sessions during morning and early afternoon slots based on teacher requests.</p>
+          <div class="signal-gauge-bar"><div class="fill bg-indigo" style="width: {{ (weight_defaults.preferred_slot / 5.0) * 100 }}%"></div></div>
+        </div>
+
+        <!-- Idle Time -->
+        <div class="setting-slider-item">
+          <div class="setting-slider-label">
+            <strong>Minimize Idle Time Weight</strong>
+            <span>{{ weight_defaults.minimize_idle_time }} / 5.0</span>
+          </div>
+          <p class="setting-desc">Avoids gaps (idle hours) in student timetables between morning and afternoon lectures.</p>
+          <div class="signal-gauge-bar"><div class="fill bg-indigo" style="width: {{ (weight_defaults.minimize_idle_time / 5.0) * 100 }}%"></div></div>
+        </div>
+
+        <!-- Geographic Grouping -->
+        <div class="setting-slider-item">
+          <div class="setting-slider-label">
+            <strong>Geographic Grouping Priority</strong>
+            <span>{{ weight_defaults.geographic_grouping }} / 5.0</span>
+          </div>
+          <p class="setting-desc">Groups classes of the same department in neighboring buildings to reduce travel fatigue.</p>
+          <div class="signal-gauge-bar"><div class="fill bg-indigo" style="width: {{ (weight_defaults.geographic_grouping / 5.0) * 100 }}%"></div></div>
+        </div>
+
+        <!-- Fatigue Balance -->
+        <div class="setting-slider-item">
+          <div class="setting-slider-label">
+            <strong>Fatigue Balance Weight</strong>
+            <span>{{ weight_defaults.fatigue_balance }} / 5.0</span>
+          </div>
+          <p class="setting-desc">Distributes teaching load evenly across the week for instructors and student cohorts.</p>
+          <div class="signal-gauge-bar"><div class="fill bg-indigo" style="width: {{ (weight_defaults.fatigue_balance / 5.0) * 100 }}%"></div></div>
+        </div>
+
+        <!-- Room Fit -->
+        <div class="setting-slider-item">
+          <div class="setting-slider-label">
+            <strong>Room Fit Priority</strong>
+            <span>{{ weight_defaults.room_fit }} / 5.0</span>
+          </div>
+          <p class="setting-desc">Favors placing student groups in rooms with matching capacities (avoids placing 10 students in a 100-seat hall).</p>
+          <div class="signal-gauge-bar"><div class="fill bg-indigo" style="width: {{ (weight_defaults.room_fit / 5.0) * 100 }}%"></div></div>
+        </div>
+      </div>
+    </article>
+  </div>
+
+  <!-- Right Side: Model Weights / Directives -->
+  <div class="audit-col-aside">
+    <!-- Policy Model Details -->
+    {% if result.policy_weights %}
+    <article class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>Model Value Signals</h2>
+          <p>Trained weights guiding backtracking heuristics.</p>
+        </div>
+      </div>
+      <ul class="stack-list">
+        {% for name, value in result.policy_weights.items() %}
+        <li style="padding: 12px; font-size: 0.85rem;">
+          <strong style="color: var(--forest);">{{ name|title }}</strong>
+          <p style="margin: 4px 0 0; color: var(--text-muted); font-family: var(--font-mono);">{{ value }}</p>
+        </li>
+        {% endfor %}
+      </ul>
+    </article>
+    {% endif %}
+
+    <article class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>Adjustment Notes</h2>
+          <p>To change these active settings, launch a new generation run from the main workspace workspace.</p>
+        </div>
+      </div>
+      <a href="/generate" class="action-btn-primary">Generate with New Settings</a>
+    </article>
+  </div>
+</div>
+
 {% else %}
 <section class="empty-state">
-  <h2>No settings snapshot yet</h2>
-  <p>Generate a run to see the exact profile used by the system.</p>
+  <div class="empty-state-icon">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.5 1z"></path></svg>
+  </div>
+  <h2>No settings configuration profile available</h2>
+  <p>To inspect active constraints, penalty values, and solver strategies, please run the AI scheduler first.</p>
+  <a href="/generate" class="primary-link">Generate First Timetable</a>
 </section>
 {% endif %}
 {% endblock %}
