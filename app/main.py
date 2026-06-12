@@ -75,10 +75,12 @@ def _base_context(request: Request, active_page: str, run_id: Optional[str] = No
         lecturer_options = list(sample_problem.lecturers.values())
         slot_options = list(sample_problem.slots.values())
         room_options = list(sample_problem.rooms.values())
+        course_options = list(sample_problem.courses.values())
     except Exception:
         lecturer_options = []
         slot_options = []
         room_options = []
+        course_options = []
     return {
         "request": request,
         "active_page": active_page,
@@ -96,6 +98,7 @@ def _base_context(request: Request, active_page: str, run_id: Optional[str] = No
         "lecturer_options": lecturer_options,
         "slot_options": slot_options,
         "room_options": room_options,
+        "course_options": course_options,
         "message": message,
         "job_status": None,
         "preference_rows": [{"lecturer_id": "", "request_text": "", "slot": "", "day": ""}],
@@ -313,6 +316,7 @@ def _run_context(request: Request, active_page: str, run_id: Optional[str], mess
         "lecturer_options": list(run["problem"].lecturers.values()),
         "slot_options": list(run["problem"].slots.values()),
         "room_options": list(run["problem"].rooms.values()),
+        "course_options": list(run["problem"].courses.values()),
         "message": message,
         "job_status": None,
         "preference_rows": run["preference_rows"] or [{"lecturer_id": "", "request_text": "", "slot": "", "day": ""}],

@@ -110,7 +110,7 @@
           </tr>
         </thead>
         <tbody>
-          {% for course in result.problem.courses.values() %}
+          {% for course in course_options %}
           <tr>
             <td class="font-mono"><strong>{{ course.code }}</strong></td>
             <td>{{ course.title }}</td>
