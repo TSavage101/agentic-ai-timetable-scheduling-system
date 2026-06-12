@@ -62,6 +62,13 @@
       </div>
     </div>
     
+    <div style="margin-bottom: 24px; max-width: 400px; position: relative;">
+      <input type="text" id="pref-search-input" placeholder="Search preferences by lecturer ID or name..." style="width: 100%; padding: 12px 16px; border: 1.5px solid #cbd5e1; border-radius: var(--radius-sm); font-size: 0.85rem;" onkeyup="filterPreferences()" />
+      <span style="position: absolute; right: 14px; top: 12px; color: var(--text-muted);">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+      </span>
+    </div>
+
     <div class="preview-table">
       <table>
         <thead>
@@ -75,9 +82,9 @@
         </thead>
         <tbody>
           {% for pref in preference_rows %}
-          <tr>
-            <td class="font-mono"><strong>{{ pref.lecturer_id or 'GENERIC' }}</strong></td>
-            <td>
+          <tr class="pref-row">
+            <td class="font-mono pref-id"><strong>{{ pref.lecturer_id or 'GENERIC' }}</strong></td>
+            <td class="pref-name">
               {% for lec in lecturer_options %}
                 {% if lec.id == pref.lecturer_id %}{{ lec.name }}{% endif %}
               {% endfor %}
@@ -103,6 +110,13 @@
       </div>
     </div>
     
+    <div style="margin-bottom: 24px; max-width: 400px; position: relative;">
+      <input type="text" id="course-search-input" placeholder="Search courses by code or title..." style="width: 100%; padding: 12px 16px; border: 1.5px solid #cbd5e1; border-radius: var(--radius-sm); font-size: 0.85rem;" onkeyup="filterCourses()" />
+      <span style="position: absolute; right: 14px; top: 12px; color: var(--text-muted);">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+      </span>
+    </div>
+
     <div class="preview-table">
       <table>
         <thead>
@@ -118,9 +132,9 @@
         </thead>
         <tbody>
           {% for course in course_options %}
-          <tr>
-            <td class="font-mono"><strong>{{ course.code }}</strong></td>
-            <td>{{ course.title }}</td>
+          <tr class="course-row">
+            <td class="font-mono course-code"><strong>{{ course.code }}</strong></td>
+            <td class="course-title">{{ course.title }}</td>
             <td class="font-mono">{{ course.lecturer_id }}</td>
             <td>{{ course.department }}</td>
             <td><span class="room-pill">{{ course.student_count }} students</span></td>
@@ -144,6 +158,13 @@
       </div>
     </div>
     
+    <div style="margin-bottom: 24px; max-width: 400px; position: relative;">
+      <input type="text" id="avail-search-input" placeholder="Search availability by lecturer name or ID..." style="width: 100%; padding: 12px 16px; border: 1.5px solid #cbd5e1; border-radius: var(--radius-sm); font-size: 0.85rem;" onkeyup="filterAvailability()" />
+      <span style="position: absolute; right: 14px; top: 12px; color: var(--text-muted);">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+      </span>
+    </div>
+
     <div class="preview-table">
       <table>
         <thead>
@@ -157,8 +178,8 @@
         </thead>
         <tbody>
           {% for lecturer in lecturer_options %}
-          <tr>
-            <td><strong>{{ lecturer.name }}</strong> ({{ lecturer.id }})</td>
+          <tr class="avail-row">
+            <td class="avail-name"><strong>{{ lecturer.name }}</strong> ({{ lecturer.id }})</td>
             <td><span class="room-pill">{{ lecturer.max_hours_per_day }}h / day</span></td>
             <td><span class="room-pill">{{ lecturer.max_hours_per_week }}h / week</span></td>
             <td>
@@ -228,6 +249,53 @@
         card.style.setProperty('display', 'flex', 'important');
       } else {
         card.style.setProperty('display', 'none', 'important');
+      }
+    });
+  }
+
+  function filterCourses() {
+    const query = document.getElementById('course-search-input').value.toLowerCase();
+    const rows = document.querySelectorAll('.course-row');
+    
+    rows.forEach(row => {
+      const code = row.querySelector('.course-code').textContent.toLowerCase();
+      const title = row.querySelector('.course-title').textContent.toLowerCase();
+      
+      if (code.includes(query) || title.includes(query)) {
+        row.style.display = '';
+      } else {
+        row.style.display = 'none';
+      }
+    });
+  }
+
+  function filterPreferences() {
+    const query = document.getElementById('pref-search-input').value.toLowerCase();
+    const rows = document.querySelectorAll('.pref-row');
+    
+    rows.forEach(row => {
+      const id = row.querySelector('.pref-id').textContent.toLowerCase();
+      const name = row.querySelector('.pref-name').textContent.toLowerCase();
+      
+      if (id.includes(query) || name.includes(query)) {
+        row.style.display = '';
+      } else {
+        row.style.display = 'none';
+      }
+    });
+  }
+
+  function filterAvailability() {
+    const query = document.getElementById('avail-search-input').value.toLowerCase();
+    const rows = document.querySelectorAll('.avail-row');
+    
+    rows.forEach(row => {
+      const name = row.querySelector('.avail-name').textContent.toLowerCase();
+      
+      if (name.includes(query)) {
+        row.style.display = '';
+      } else {
+        row.style.display = 'none';
       }
     });
   }
