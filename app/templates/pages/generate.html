@@ -241,11 +241,45 @@
 
       <div class="form-section">
         <h3>Soft Constraint Weighting</h3>
-        <label><span>Preferred Time Slot Weight</span><input type="range" name="preferred_slot_weight" min="0" max="5" step="0.1" value="{{ weight_defaults.preferred_slot }}" /></label>
-        <label><span>Minimize Idle Time Weight</span><input type="range" name="idle_time_weight" min="0" max="5" step="0.1" value="{{ weight_defaults.minimize_idle_time }}" /></label>
-        <label><span>Geographic Grouping Priority</span><input type="range" name="geographic_weight" min="0" max="5" step="0.1" value="{{ weight_defaults.geographic_grouping }}" /></label>
-        <label><span>Fatigue Balance Weight</span><input type="range" name="fatigue_weight" min="0" max="5" step="0.1" value="{{ weight_defaults.fatigue_balance }}" /></label>
-        <label><span>Room Fit Priority</span><input type="range" name="room_fit_weight" min="0" max="5" step="0.1" value="{{ weight_defaults.room_fit }}" /></label>
+        <label>
+          <span style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+            <span>Preferred Time Slot Weight</span>
+            <span id="preferred_slot_weight_pct" style="font-weight: 600; color: var(--forest);">{{ ((weight_defaults.preferred_slot / 5.0) * 100) | round | int }}%</span>
+          </span>
+          <input type="range" name="preferred_slot_weight" min="0" max="5" step="0.1" value="{{ weight_defaults.preferred_slot }}" oninput="updateWeightPct(this, 'preferred_slot_weight_pct')" />
+        </label>
+        
+        <label>
+          <span style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+            <span>Minimize Idle Time Weight</span>
+            <span id="idle_time_weight_pct" style="font-weight: 600; color: var(--forest);">{{ ((weight_defaults.minimize_idle_time / 5.0) * 100) | round | int }}%</span>
+          </span>
+          <input type="range" name="idle_time_weight" min="0" max="5" step="0.1" value="{{ weight_defaults.minimize_idle_time }}" oninput="updateWeightPct(this, 'idle_time_weight_pct')" />
+        </label>
+        
+        <label>
+          <span style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+            <span>Geographic Grouping Priority</span>
+            <span id="geographic_weight_pct" style="font-weight: 600; color: var(--forest);">{{ ((weight_defaults.geographic_grouping / 5.0) * 100) | round | int }}%</span>
+          </span>
+          <input type="range" name="geographic_weight" min="0" max="5" step="0.1" value="{{ weight_defaults.geographic_grouping }}" oninput="updateWeightPct(this, 'geographic_weight_pct')" />
+        </label>
+        
+        <label>
+          <span style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+            <span>Fatigue Balance Weight</span>
+            <span id="fatigue_weight_pct" style="font-weight: 600; color: var(--forest);">{{ ((weight_defaults.fatigue_balance / 5.0) * 100) | round | int }}%</span>
+          </span>
+          <input type="range" name="fatigue_weight" min="0" max="5" step="0.1" value="{{ weight_defaults.fatigue_balance }}" oninput="updateWeightPct(this, 'fatigue_weight_pct')" />
+        </label>
+        
+        <label>
+          <span style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+            <span>Room Fit Priority</span>
+            <span id="room_fit_weight_pct" style="font-weight: 600; color: var(--forest);">{{ ((weight_defaults.room_fit / 5.0) * 100) | round | int }}%</span>
+          </span>
+          <input type="range" name="room_fit_weight" min="0" max="5" step="0.1" value="{{ weight_defaults.room_fit }}" oninput="updateWeightPct(this, 'room_fit_weight_pct')" />
+        </label>
       </div>
 
       <div class="wizard-actions">
@@ -279,7 +313,7 @@
     <div class="job-status-feedback">
       <div class="progress-section">
         <div class="progress-info">
-          <span>Current Job: {{ job_status.job_id[:12] }}</span>
+          <span>AI Engine</span>
           <strong>Processing...</strong>
         </div>
         <div class="progress-bar-rail">
@@ -334,6 +368,11 @@
 
 <!-- Wizard Navigation and upload handlers script -->
 <script>
+  function updateWeightPct(input, targetId) {
+    const pct = Math.round((parseFloat(input.value) / 5.0) * 100);
+    document.getElementById(targetId).textContent = pct + '%';
+  }
+
   let currentStep = 1;
 
   function goToStep(stepNum) {

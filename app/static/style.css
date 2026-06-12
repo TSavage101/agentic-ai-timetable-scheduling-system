@@ -1061,14 +1061,14 @@ button:hover,
 }
 
 .ghost-button {
-  background-color: transparent;
-  border-color: var(--grid-border);
-  color: var(--text-muted);
+  background-color: transparent !important;
+  border-color: #cbd5e1 !important;
+  color: #475569 !important;
 }
 
 .ghost-button:hover {
-  background-color: #f1f5f9;
-  color: var(--text);
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
 }
 
 .pill-link {
