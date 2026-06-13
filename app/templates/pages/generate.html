@@ -127,7 +127,7 @@
       <div class="panel-head">
         <div>
           <h2>File Validation Results</h2>
-          <p>The system is verifying headers, datatypes, and constraints references.</p>
+          <p>The system is verifying core headers, datatypes, and timetable references.</p>
         </div>
       </div>
 
@@ -136,14 +136,14 @@
           <span class="status-indicator-dot success"></span>
           <div>
             <strong>Courses CSV</strong>
-            <p>Headers verified: course_code, course_title, department, level, lecturer_id, room_type, student_count</p>
+            <p>Headers verified: course_code, course_title, department, level, room_type, student_count</p>
           </div>
         </div>
         <div class="validation-item" id="val-lecturers">
           <span class="status-indicator-dot success"></span>
           <div>
             <strong>Lecturers CSV</strong>
-            <p>Headers verified: lecturer_id, lecturer_name, unavailable_slots, max_hours_per_day</p>
+            <p>Headers verified: lecturer_id, lecturer_name, department, max_hours_per_day</p>
           </div>
         </div>
         <div class="validation-item" id="val-rooms">
@@ -175,26 +175,29 @@
       <div class="panel-head">
         <div>
           <h2>Scheduling Engine & Optimization Profile</h2>
-          <p>Adjust modes, hard rules, and soft preference weights.</p>
+          <p>Run the single agentic scheduler, then fine-tune the hard rules and scoring weights around it.</p>
         </div>
       </div>
 
       <div class="form-section">
-        <h3>Optimization Strategy</h3>
+        <h3>Scheduler Mode</h3>
+        <input type="hidden" name="strategy" value="hybrid" />
         <label>
-          <span>Solver Mode</span>
-          <select name="strategy">
-            <option value="hybrid" {% if selected_strategy == "hybrid" %}selected{% endif %}>Hybrid Agentic + Genetic</option>
-            <option value="policy" {% if selected_strategy == "policy" %}selected{% endif %}>Policy-Guided Agent</option>
-            <option value="genetic" {% if selected_strategy == "genetic" %}selected{% endif %}>Genetic Optimizer</option>
-            <option value="heuristic" {% if selected_strategy == "heuristic" %}selected{% endif %}>Pure Heuristic</option>
-          </select>
+          <span>Active Scheduler</span>
+          <input type="text" value="{{ strategy_label }}" readonly />
         </label>
         <div class="inline-fields">
           <label><span>Training Episodes</span><input type="number" name="training_episodes" min="0" max="500" value="{{ training_episodes }}" /></label>
           <label><span>Generations</span><input type="number" name="generations" min="1" max="100" value="{{ generations }}" /></label>
         </div>
         <label><span>Natural Language Prompt (Optional)</span><input type="text" name="nl_request" value="{{ result.natural_language_request if result else '' }}" placeholder="e.g. Schedule all CS courses in the morning slots" /></label>
+        <div class="validation-item">
+          <span class="status-indicator-dot success"></span>
+          <div>
+            <strong>Recommended data model</strong>
+            <p>Feed the scheduler clean course, lecturer, room, timeslot, and student-group data. `preferred_slots` and `blocked_slots` are optional compatibility fields, not required input columns.</p>
+          </div>
+        </div>
       </div>
 
       <div class="form-section">

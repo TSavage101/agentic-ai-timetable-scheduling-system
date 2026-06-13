@@ -1,0 +1,4 @@
+id,name,capacity,room_type,location,equipment
+R101,Senate Hall,250,lecture,Main Campus,projector
+R102,ICT Lab 1,80,lab,Tech Block,projector|computers
+R103,Engineering Studio,90,lab,Engineering Block,projector

@@ -1,0 +1,5 @@
+id,name,departments,max_hours_per_day,max_hours_per_week,unavailable_slots
+L001,Prof Oyelade,Computer Science|Management and Information Sciences,4,12,TUE_14
+L002,Mr Osofuye,Computer Science|Management and Information Sciences,4,12,
+L003,Dr Akinsete,Civil Engineering,4,12,FRI_10
+L004,Prof Adeniran,General Studies|ALDC,3,10,

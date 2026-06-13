@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import io
 import re
+import zipfile
 from dataclasses import replace
 from pathlib import Path
-from typing import Dict, Iterable, List
+from typing import Dict, Iterable, List, Tuple
 
 import pandas as pd
 
@@ -33,6 +34,7 @@ COURSE_ALIASES = {
 LECTURER_ALIASES = {
     "id": ["id", "lecturer_id"],
     "name": ["name", "lecturer_name", "full_name"],
+    "departments": ["departments", "department", "dept", "specialization", "specializations"],
     "unavailable_slots": ["unavailable_slots", "unavailable", "blocked_slots", "restricted_slots"],
     "preferred_slots": ["preferred_slots", "preferred_slot", "preferred_times", "preferred_timeslots"],
     "max_hours_per_day": ["max_hours_per_day", "max_hours_day", "daily_limit", "max_daily_hours"],
@@ -62,6 +64,120 @@ STUDENT_GROUP_ALIASES = {
     "name": ["group_name", "name"],
     "student_count": ["student_count", "students", "size", "cohort_size"],
 }
+
+DEPARTMENT_LECTURER_POOLS: Dict[str, List[str]] = {
+    "cst": [
+        "Prof Oyelade",
+        "Mr Osofuye",
+        "Miss Tunde-Adeleke",
+        "Dr Iheanatu",
+        "Mr Franklyn",
+        "Dr Jonathan",
+        "Mrs Abiodun",
+        "Mr Ogunyale",
+        "Dr Elliot",
+        "Mr Ogbu",
+        "Mr Otavie",
+        "Dr Odili",
+        "Mr Ejiobih",
+        "Miss Nathaniel",
+        "Dr Azu",
+    ],
+    "cmss": [
+        "Dr Akinlabi",
+        "Mrs Ezenwa",
+        "Mr Bamidele",
+        "Dr Nwachukwu",
+        "Mrs Balogun",
+        "Mr Ibe",
+        "Dr Afolayan",
+        "Miss Chukwu",
+        "Mr Salami",
+        "Dr Okonkwo",
+    ],
+    "clds": [
+        "Dr Aderinto",
+        "Mrs Umeh",
+        "Mr Fagbemi",
+        "Dr Madu",
+        "Mrs Oladipo",
+        "Mr Ekanem",
+        "Dr Lawal",
+        "Miss Nnamani",
+        "Mr Duru",
+        "Dr Obiakor",
+    ],
+    "coe": [
+        "Dr Akinsete",
+        "Mr Olanrewaju",
+        "Mrs Chidubem",
+        "Dr Danjuma",
+        "Mr Udo",
+        "Dr Eromosele",
+        "Mrs Akinola",
+        "Mr Ndukwe",
+        "Dr Bakare",
+        "Mr Eyo",
+    ],
+    "aldc": [
+        "Prof Adeniran",
+        "Dr Chukwuma",
+        "Mrs Adebayo",
+        "Chaplain Michael Eze",
+        "Mr Adesina",
+        "Dr Kalu",
+    ],
+}
+
+DEPARTMENT_GROUPS: Dict[str, List[str]] = {
+    "cst": [
+        "architecture",
+        "building technology",
+        "estate management",
+        "biochemistry",
+        "chemistry",
+        "computer and information sciences",
+        "computer science",
+        "management and information sciences",
+        "management information science",
+        "mis",
+        "microbiology",
+        "industrial chemistry",
+        "industrial mathematics",
+        "industrial mathemactics",
+        "industrial physics",
+    ],
+    "cmss": [
+        "accounting",
+        "banking/finance",
+        "banking and finance",
+        "business administration",
+        "business addminstration",
+        "economics",
+        "mass communication",
+        "sociology",
+    ],
+    "clds": [
+        "english",
+        "international relations",
+        "policy and strategic studies",
+        "political science",
+        "psychology",
+    ],
+    "coe": [
+        "chemical engineering",
+        "civil engineering",
+        "computer engineering",
+        "electrical / electronics engineering",
+        "electrical electronics engineering",
+        "electrical and electronics engineering",
+        "information and communication engineering",
+        "mechanical engineering",
+        "petroleum engineering",
+    ],
+}
+
+GENERAL_COURSE_PREFIXES = ("GST", "TMC", "EDS", "DLD", "ALDC")
 
 
 def _split_values(value: object) -> List[str]:
@@ -126,6 +242,101 @@ def _normalize_room_type(value: str) -> str:
     return cleaned or "lecture"
 
 
+def _normalize_department_name(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", value.lower()).strip()
+
+
+def _department_pool_key(department: str, course_code: str = "") -> str:
+    normalized = _normalize_department_name(department)
+    if any(course_code.upper().startswith(prefix) for prefix in GENERAL_COURSE_PREFIXES):
+        return "aldc"
+    for pool_key, entries in DEPARTMENT_GROUPS.items():
+        if normalized in (_normalize_department_name(item) for item in entries):
+            return pool_key
+    return normalized or "general"
+
+
+def _build_generated_lecturers(course_rows: List[dict], lecturer_rows: List[dict]) -> Dict[str, Lecturer]:
+    generated: Dict[str, Lecturer] = {}
+    inferred_departments: Dict[str, set[str]] = {}
+    for row in course_rows:
+        lecturer_id = _clean_scalar(row.get("lecturer_id"))
+        department = _clean_scalar(row.get("department"))
+        if lecturer_id and department:
+            inferred_departments.setdefault(lecturer_id, set()).add(department)
+
+    for row in lecturer_rows:
+        lecturer_id = _clean_scalar(row.get("id"))
+        if not lecturer_id:
+            continue
+        max_h_day = _clean_int(row.get("max_hours_per_day"), 4)
+        max_h_week = _clean_int(row.get("max_hours_per_week"), 12)
+        row_departments = set(_split_values(row.get("departments"))) or inferred_departments.get(lecturer_id, set())
+        generated[lecturer_id] = Lecturer(
+            id=lecturer_id,
+            name=_clean_scalar(row.get("name"), lecturer_id),
+            departments=frozenset(row_departments),
+            unavailable_slots=frozenset(_split_values(row.get("unavailable_slots"))),
+            preferred_slots=frozenset(_split_values(row.get("preferred_slots"))),
+            max_hours_per_day=max_h_day if max_h_day > 0 else 4,
+            max_hours_per_week=max_h_week if max_h_week > 0 else 12,
+        )
+
+    departments_needed = {
+        (_clean_scalar(row.get("department")), _clean_scalar(row.get("code")))
+        for row in course_rows
+        if _clean_scalar(row.get("department")) or _clean_scalar(row.get("code"))
+    }
+    for department, course_code in departments_needed:
+        pool_key = _department_pool_key(department, course_code)
+        names = DEPARTMENT_LECTURER_POOLS.get(pool_key, [])
+        for index, name in enumerate(names, start=1):
+            lecturer_id = f"AUTO_{pool_key.upper()}_{index:02d}"
+            if lecturer_id in generated:
+                continue
+            generated[lecturer_id] = Lecturer(
+                id=lecturer_id,
+                name=name,
+                departments=frozenset({department or pool_key.upper()}),
+            )
+    return generated
+
+
+def _eligible_lecturers_for_course(lecturers: Dict[str, Lecturer], department: str, course_code: str) -> List[Lecturer]:
+    pool_key = _department_pool_key(department, course_code)
+    normalized_department = _normalize_department_name(department)
+    eligible: List[Lecturer] = []
+    for lecturer in lecturers.values():
+        if not lecturer.departments:
+            if pool_key in {"aldc", "general"}:
+                eligible.append(lecturer)
+            continue
+        normalized_departments = {_normalize_department_name(item) for item in lecturer.departments}
+        if normalized_department in normalized_departments:
+            eligible.append(lecturer)
+            continue
+        if pool_key == "aldc" and any(
+            marker in normalized_departments
+            for marker in {
+                _normalize_department_name("General Studies"),
+                _normalize_department_name("ALDC"),
+                _normalize_department_name("Mass Communication"),
+                _normalize_department_name("Economics"),
+                _normalize_department_name("Business Administration"),
+            }
+        ):
+            eligible.append(lecturer)
+            continue
+        if pool_key != "general":
+            pool_departments = {
+                _normalize_department_name(item)
+                for item in DEPARTMENT_GROUPS.get(pool_key, [])
+            }
+            if normalized_departments & pool_departments:
+                eligible.append(lecturer)
+    return sorted(eligible, key=lambda item: (item.id.startswith("AUTO_"), item.id))
+
+
 def _load_dataframe(upload, fallback_name: str) -> pd.DataFrame:
     if upload is not None and getattr(upload, "filename", ""):
         raw = upload.file.read()
@@ -154,28 +365,14 @@ def load_problem_data(
     except Exception:
         student_groups_df = pd.DataFrame()
 
-    _require_columns(courses_df, ["id", "code", "lecturer_id", "student_count", "sessions_per_week"], "Courses")
+    _require_columns(courses_df, ["id", "code", "student_count", "sessions_per_week"], "Courses")
     _require_columns(lecturers_df, ["id", "name"], "Lecturers")
     _require_columns(rooms_df, ["id", "name", "capacity"], "Rooms")
     _require_columns(slots_df, ["id", "day", "start", "end"], "Timeslots")
 
-    lecturers: Dict[str, Lecturer] = {}
-    for row in lecturers_df.to_dict(orient="records"):
-        lecturer_id = _clean_scalar(row.get("id"))
-        max_h_day = _clean_int(row.get("max_hours_per_day"), 4)
-        if max_h_day <= 0:
-            max_h_day = 4
-        max_h_week = _clean_int(row.get("max_hours_per_week"), 12)
-        if max_h_week <= 0:
-            max_h_week = 12
-        lecturers[lecturer_id] = Lecturer(
-            id=lecturer_id,
-            name=_clean_scalar(row.get("name"), lecturer_id),
-            unavailable_slots=frozenset(_split_values(row.get("unavailable_slots"))),
-            preferred_slots=frozenset(_split_values(row.get("preferred_slots"))),
-            max_hours_per_day=max_h_day,
-            max_hours_per_week=max_h_week,
-        )
+    course_rows = courses_df.to_dict(orient="records")
+    lecturer_rows = lecturers_df.to_dict(orient="records")
+    lecturers = _build_generated_lecturers(course_rows, lecturer_rows)
 
     rooms: Dict[str, Room] = {}
     for row in rooms_df.to_dict(orient="records"):
@@ -215,7 +412,8 @@ def load_problem_data(
 
     courses: Dict[str, Course] = {}
     session_requests: List[SessionRequest] = []
-    for row in courses_df.to_dict(orient="records"):
+    course_assignment_counters: Dict[Tuple[str, str], int] = {}
+    for row in course_rows:
         course_id = _clean_scalar(row.get("id"))
         code = _clean_scalar(row.get("code"), course_id)
         title = _clean_scalar(row.get("title"), code)
@@ -250,11 +448,25 @@ def load_problem_data(
                         student_count=student_count
                     )
 
+        requested_lecturer_id = _clean_scalar(row.get("lecturer_id"))
+        eligible_lecturers = _eligible_lecturers_for_course(lecturers, dept, code)
+        lecturer_id = requested_lecturer_id
+        if lecturer_id not in lecturers or (eligible_lecturers and lecturer_id not in {item.id for item in eligible_lecturers}):
+            if eligible_lecturers:
+                assignment_key = (dept, _department_pool_key(dept, code))
+                next_index = course_assignment_counters.get(assignment_key, 0)
+                lecturer_id = eligible_lecturers[next_index % len(eligible_lecturers)].id
+                course_assignment_counters[assignment_key] = next_index + 1
+            elif lecturers:
+                lecturer_id = sorted(lecturers.keys())[0]
+            else:
+                raise ValueError(f"No lecturer roster is available for course {code}.")
+
         course = Course(
             id=course_id,
             code=code,
             title=title,
-            lecturer_id=_clean_scalar(row.get("lecturer_id")),
+            lecturer_id=lecturer_id,
             student_count=student_count,
             sessions_per_week=max(1, _clean_int(row.get("sessions_per_week"), 1)),
             room_type=_normalize_room_type(_clean_scalar(row.get("room_type"), "lecture")),
@@ -267,14 +479,19 @@ def load_problem_data(
             student_group=matched_group_id,
         )
         courses[course_id] = course
+        segment_plan = [(course.duration_hours, "")] if course.duration_hours != 3 else [(2, "A"), (1, "B")]
         for index in range(1, course.sessions_per_week + 1):
-            session_requests.append(
-                SessionRequest(
-                    session_id=f"{course.code}-S{index}",
-                    course_id=course_id,
-                    index=index,
+            for duration_hours, segment_label in segment_plan:
+                suffix = f"{index}{segment_label}" if segment_label else str(index)
+                session_requests.append(
+                    SessionRequest(
+                        session_id=f"{course.code}-S{suffix}",
+                        course_id=course_id,
+                        index=index,
+                        duration_hours=duration_hours,
+                        segment_label=segment_label,
+                    )
                 )
-            )
 
     return ProblemData(
         courses=courses,
@@ -298,4 +515,48 @@ def clone_problem_data(problem: ProblemData) -> ProblemData:
 
 
 def schedule_to_dataframe(assignments: Iterable[dict]) -> pd.DataFrame:
-    return pd.DataFrame(list(assignments))
+    dataframe = pd.DataFrame(list(assignments))
+    if dataframe.empty:
+        return dataframe
+    day_order = {
+        "Monday": 1,
+        "Tuesday": 2,
+        "Wednesday": 3,
+        "Thursday": 4,
+        "Friday": 5,
+        "Saturday": 6,
+        "Sunday": 7,
+        "Unscheduled": 99,
+    }
+    dataframe["_day_order"] = dataframe["day"].map(day_order).fillna(98)
+    dataframe = dataframe.sort_values(
+        by=["_day_order", "time", "department", "level", "course_code", "session_id"],
+        kind="stable",
+    ).drop(columns=["_day_order"])
+    return dataframe
+
+
+def schedule_to_export_bundle(assignments: Iterable[dict]) -> bytes:
+    dataframe = schedule_to_dataframe(assignments)
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("overview/timetable_overview.csv", dataframe.to_csv(index=False))
+        if dataframe.empty:
+            archive.writestr("README.txt", "No timetable rows were available for export.\n")
+            return buffer.getvalue()
+
+        summary = (
+            dataframe.groupby(["department", "level"], dropna=False)
+            .size()
+            .reset_index(name="scheduled_sessions")
+        )
+        archive.writestr("overview/department_summary.csv", summary.to_csv(index=False))
+
+        for department, frame in dataframe.groupby("department", dropna=False):
+            safe_department = re.sub(r"[^A-Za-z0-9_-]+", "_", str(department or "Unspecified")).strip("_") or "Unspecified"
+            archive.writestr(f"by_department/{safe_department}.csv", frame.to_csv(index=False))
+
+        for lecturer, frame in dataframe.groupby("lecturer", dropna=False):
+            safe_lecturer = re.sub(r"[^A-Za-z0-9_-]+", "_", str(lecturer or "Unassigned")).strip("_") or "Unassigned"
+            archive.writestr(f"by_lecturer/{safe_lecturer}.csv", frame.to_csv(index=False))
+    return buffer.getvalue()

@@ -33,11 +33,26 @@ def time_to_hours(time_str: str) -> float:
         return 0.0
 
 
-def get_session_interval(course: Course, slot: TimeSlot) -> Tuple[float, float]:
+def _session_request_lookup(problem: ProblemData) -> Dict[str, object]:
+    cached = getattr(problem, "_session_request_lookup", None)
+    if cached is None:
+        cached = {request.session_id: request for request in problem.session_requests}
+        setattr(problem, "_session_request_lookup", cached)
+    return cached
+
+
+def session_duration_hours(problem: ProblemData, session_id: str, course_id: str) -> float:
+    request = _session_request_lookup(problem).get(session_id)
+    if request is not None:
+        return float(getattr(request, "duration_hours", 1))
+    return float(problem.courses[course_id].duration_hours)
+
+
+def get_session_interval(problem: ProblemData, assignment: Assignment, slot: object) -> Tuple[float, float]:
     start = time_to_hours(slot.start)
     end = time_to_hours(slot.end)
     slot_dur = max(0.5, end - start)
-    dur = max(float(course.duration_hours), slot_dur)
+    dur = min(session_duration_hours(problem, assignment.session_id, assignment.course_id), slot_dur)
     return start, start + dur
 
 
@@ -91,8 +106,8 @@ class ConstraintAgent:
             slot = slots[assignment.slot_id]
             room = rooms[assignment.room_id]
 
-            start, end = get_session_interval(course, slot)
-            dur = float(course.duration_hours)
+            start, end = get_session_interval(problem, assignment, slot)
+            dur = session_duration_hours(problem, assignment.session_id, assignment.course_id)
 
             # Record intervals
             room_intervals[room.id][slot.day].append((start, end, assignment.session_id))
@@ -795,11 +810,10 @@ class CSPSolver:
         backtrack_count = 0
         timeout_reached = False
 
-        def get_interval(slot_id: str, course_id: str) -> Tuple[float, float]:
-            course = self.courses[course_id]
+        def get_interval(slot_id: str, session_id: str, course_id: str) -> Tuple[float, float]:
             start_h, end_h = self.slot_intervals[slot_id]
             slot_dur = max(0.5, end_h - start_h)
-            dur = max(float(course.duration_hours), slot_dur)
+            dur = min(session_duration_hours(self.problem, session_id, course_id), slot_dur)
             return start_h, start_h + dur
 
         def check_overlap(start: float, end: float, intervals: list) -> bool:
@@ -828,8 +842,8 @@ class CSPSolver:
                         if slot.id in lecturer.unavailable_slots or slot.id in course.blocked_slots:
                             continue
                         
-                        start, end = get_interval(slot.id, course.id)
-                        dur = float(course.duration_hours)
+                        start, end = get_interval(slot.id, req.session_id, course.id)
+                        dur = session_duration_hours(self.problem, req.session_id, course.id)
                         
                         if lecturer_daily_hours[course.lecturer_id][slot.day] + dur > lecturer.max_hours_per_day:
                             continue
@@ -877,8 +891,8 @@ class CSPSolver:
             for slot in self.slots.values():
                 if slot.id in lecturer.unavailable_slots or slot.id in course.blocked_slots:
                     continue
-                start, end = get_interval(slot.id, course.id)
-                dur = float(course.duration_hours)
+                start, end = get_interval(slot.id, next_req.session_id, course.id)
+                dur = session_duration_hours(self.problem, next_req.session_id, course.id)
                 
                 if lecturer_daily_hours[course.lecturer_id][slot.day] + dur > lecturer.max_hours_per_day:
                     continue
@@ -916,7 +930,7 @@ class CSPSolver:
             candidates.sort(key=lambda x: -x[0])
 
             for score, slot, room, start, end in candidates:
-                dur = float(course.duration_hours)
+                dur = session_duration_hours(self.problem, next_req.session_id, course.id)
 
                 assignments[next_req.session_id].slot_id = slot.id
                 assignments[next_req.session_id].room_id = room.id
@@ -967,8 +981,8 @@ class CSPSolver:
                 course = self.courses[req.course_id]
                 slot = self.slots[assign.slot_id]
                 room = self.rooms[assign.room_id]
-                start, end = get_interval(assign.slot_id, req.course_id)
-                dur = float(course.duration_hours)
+                start, end = get_interval(assign.slot_id, req.session_id, req.course_id)
+                dur = session_duration_hours(self.problem, req.session_id, req.course_id)
 
                 best_room_schedules[room.id][slot.day].append((start, end, req.session_id))
                 best_lecturer_schedules[course.lecturer_id][slot.day].append((start, end, req.session_id))
@@ -1011,8 +1025,8 @@ class CSPSolver:
                         total_attempts = 0
 
                         for slot in available_slots:
-                            start, end = get_interval(slot.id, course.id)
-                            dur = float(course.duration_hours)
+                            start, end = get_interval(slot.id, req.session_id, course.id)
+                            dur = session_duration_hours(self.problem, req.session_id, course.id)
 
                             if best_lecturer_daily_hours[course.lecturer_id][slot.day] + dur > lecturer.max_hours_per_day:
                                 lecturer_limit_count += 1

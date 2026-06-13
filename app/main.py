@@ -14,18 +14,21 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from .agents import OrchestratorAgent
-from .io_utils import clone_problem_data, load_problem_data, schedule_to_dataframe
+from .io_utils import clone_problem_data, load_problem_data, schedule_to_export_bundle
 from .models import Assignment, ConstraintConfig, ProblemData, SoftConstraintWeights
 
 
 BASE_DIR = Path(__file__).resolve().parent
-app = FastAPI(title="Agentic AI Timetable Scheduling System")
+app = FastAPI(title="University Timetable Scheduler")
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 orchestrator = OrchestratorAgent()
 EXPORT_CACHE: Dict[str, object] = {}
 RUN_CACHE: Dict[str, Dict[str, Any]] = {}
 JOB_CACHE: Dict[str, Dict[str, Any]] = {}
+AUTH_COOKIE = "uts_admin"
+ADMIN_EMAIL = "admin@university.edu.ng"
+ADMIN_PASSWORD = "admin123"
 
 
 NAV_ITEMS = [
@@ -44,6 +47,10 @@ def _latest_run_id() -> Optional[str]:
     if not RUN_CACHE:
         return None
     return list(RUN_CACHE.keys())[-1]
+
+
+def _is_authenticated(request: Request) -> bool:
+    return request.cookies.get(AUTH_COOKIE) == "1"
 
 
 def _page_meta(page: str) -> tuple[str, str]:
@@ -91,6 +98,7 @@ def _base_context(request: Request, active_page: str, run_id: Optional[str] = No
         "run_id": run_id,
         "download_id": None,
         "selected_strategy": "hybrid",
+        "strategy_label": "Agentic AI Scheduler",
         "training_episodes": 10,
         "generations": 8,
         "constraint_defaults": ConstraintConfig(),
@@ -309,6 +317,7 @@ def _run_context(request: Request, active_page: str, run_id: Optional[str], mess
         "run_id": run_id,
         "download_id": download_id,
         "selected_strategy": run["strategy"],
+        "strategy_label": "Agentic AI Scheduler",
         "training_episodes": run["training_episodes"],
         "generations": run["generations"],
         "constraint_defaults": run["config"],
@@ -336,6 +345,12 @@ def _render(request: Request, page: str, run_id: Optional[str] = None, message: 
     active_run = run_id or _latest_run_id()
     context = _job_context(request, page, job_id, active_run, message)
     return templates.TemplateResponse(request, f"pages/{page}.html", context)
+
+
+def _auth_redirect(request: Request) -> Optional[RedirectResponse]:
+    if _is_authenticated(request):
+        return None
+    return RedirectResponse("/login", status_code=303)
 
 
 def _store_run(
@@ -442,12 +457,65 @@ def _run_generation_job(
 
 
 @app.get("/", response_class=HTMLResponse)
-async def home() -> RedirectResponse:
-    return RedirectResponse("/dashboard")
+async def home(request: Request) -> RedirectResponse:
+    if _is_authenticated(request):
+        return RedirectResponse("/dashboard", status_code=303)
+    return RedirectResponse("/login", status_code=303)
+
+
+@app.get("/login", response_class=HTMLResponse)
+async def login_page(request: Request):
+    if _is_authenticated(request):
+        return RedirectResponse("/dashboard", status_code=303)
+    return templates.TemplateResponse(
+        request,
+        "pages/login.html",
+        {
+            "request": request,
+            "page_title": "Welcome back, Admin",
+            "page_subtitle": "Sign in to access the university timetable dashboard.",
+            "message": "",
+            "default_email": ADMIN_EMAIL,
+        },
+    )
+
+
+@app.post("/login", response_class=HTMLResponse)
+async def login_submit(
+    request: Request,
+    email: str = Form(...),
+    password: str = Form(...),
+):
+    if email.strip().lower() != ADMIN_EMAIL or password != ADMIN_PASSWORD:
+        return templates.TemplateResponse(
+            request,
+            "pages/login.html",
+            {
+                "request": request,
+                "page_title": "Welcome back, Admin",
+                "page_subtitle": "Sign in to access the university timetable dashboard.",
+                "message": "Invalid email or password. Use the project admin credentials to continue.",
+                "default_email": ADMIN_EMAIL,
+            },
+            status_code=401,
+        )
+    response = RedirectResponse("/dashboard", status_code=303)
+    response.set_cookie(AUTH_COOKIE, "1", httponly=True, samesite="lax")
+    return response
+
+
+@app.post("/logout")
+async def logout() -> RedirectResponse:
+    response = RedirectResponse("/login", status_code=303)
+    response.delete_cookie(AUTH_COOKIE)
+    return response
 
 
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(request: Request, run_id: str | None = Query(default=None)) -> HTMLResponse:
+    redirect = _auth_redirect(request)
+    if redirect:
+        return redirect
     return _render(request, "dashboard", run_id)
 
 
@@ -457,6 +525,9 @@ async def generate_page(
     run_id: str | None = Query(default=None),
     job_id: str | None = Query(default=None),
 ) -> HTMLResponse:
+    redirect = _auth_redirect(request)
+    if redirect:
+        return redirect
     message = ""
     if job_id and job_id in JOB_CACHE:
         status = JOB_CACHE[job_id]["status"]
@@ -472,31 +543,49 @@ async def generate_page(
 
 @app.get("/timetable", response_class=HTMLResponse)
 async def timetable_page(request: Request, run_id: str | None = Query(default=None)) -> HTMLResponse:
+    redirect = _auth_redirect(request)
+    if redirect:
+        return redirect
     return _render(request, "timetable", run_id)
 
 
 @app.get("/scenarios", response_class=HTMLResponse)
 async def scenarios_page(request: Request, run_id: str | None = Query(default=None)) -> HTMLResponse:
+    redirect = _auth_redirect(request)
+    if redirect:
+        return redirect
     return _render(request, "scenarios", run_id)
 
 
 @app.get("/resources", response_class=HTMLResponse)
 async def resources_page(request: Request, run_id: str | None = Query(default=None)) -> HTMLResponse:
+    redirect = _auth_redirect(request)
+    if redirect:
+        return redirect
     return _render(request, "resources", run_id)
 
 
 @app.get("/feedback", response_class=HTMLResponse)
 async def feedback_page(request: Request, run_id: str | None = Query(default=None)) -> HTMLResponse:
+    redirect = _auth_redirect(request)
+    if redirect:
+        return redirect
     return _render(request, "feedback", run_id)
 
 
 @app.get("/audit", response_class=HTMLResponse)
 async def audit_page(request: Request, run_id: str | None = Query(default=None)) -> HTMLResponse:
+    redirect = _auth_redirect(request)
+    if redirect:
+        return redirect
     return _render(request, "audit", run_id)
 
 
 @app.get("/settings", response_class=HTMLResponse)
 async def settings_page(request: Request, run_id: str | None = Query(default=None)) -> HTMLResponse:
+    redirect = _auth_redirect(request)
+    if redirect:
+        return redirect
     return _render(request, "settings", run_id)
 
 
@@ -538,6 +627,9 @@ async def generate_schedule(
     disruption_slot: List[str] = Form(default=[]),
     disruption_note: List[str] = Form(default=[]),
 ) -> HTMLResponse:
+    redirect = _auth_redirect(request)
+    if redirect:
+        return redirect
     config = _constraint_config_from_form(
         lecturer_double_booking is not None,
         room_exclusivity is not None,
@@ -620,6 +712,9 @@ async def adjust_schedule(
     session_id: str = Form(...),
     target_slot_id: str = Form(...),
 ) -> HTMLResponse:
+    redirect = _auth_redirect(request)
+    if redirect:
+        return redirect
     if run_id not in RUN_CACHE:
         return _render(request, "timetable", None)
     run = RUN_CACHE[run_id]
@@ -629,6 +724,9 @@ async def adjust_schedule(
 
 @app.post("/approve", response_class=HTMLResponse)
 async def approve_schedule(request: Request, run_id: str = Form(...)) -> HTMLResponse:
+    redirect = _auth_redirect(request)
+    if redirect:
+        return redirect
     if run_id in RUN_CACHE:
         RUN_CACHE[run_id]["approved"] = True
     return _render(request, "timetable", run_id, "Timetable approved and marked ready for handoff.")
@@ -641,22 +739,25 @@ async def submit_feedback(
     feedback_rating: int = Form(...),
     feedback_comment: str = Form(default=""),
 ) -> HTMLResponse:
+    redirect = _auth_redirect(request)
+    if redirect:
+        return redirect
     if run_id in RUN_CACHE:
         RUN_CACHE[run_id]["feedback_log"].append({"rating": feedback_rating, "comment": feedback_comment})
     return _render(request, "feedback", run_id, "Feedback saved to the improvement log.")
 
 
 @app.get("/download/{download_id}")
-async def download_schedule(download_id: str):
+async def download_schedule(request: Request, download_id: str):
+    redirect = _auth_redirect(request)
+    if redirect:
+        return redirect
     rows = EXPORT_CACHE.get(download_id)
     if rows is None:
         return RedirectResponse("/dashboard")
-    dataframe = schedule_to_dataframe(rows)
-    buffer = io.StringIO()
-    dataframe.to_csv(buffer, index=False)
-    buffer.seek(0)
+    archive_bytes = schedule_to_export_bundle(rows)
     return StreamingResponse(
-        iter([buffer.getvalue()]),
-        media_type="text/csv",
-        headers={"Content-Disposition": "attachment; filename=timetable.csv"},
+        iter([archive_bytes]),
+        media_type="application/zip",
+        headers={"Content-Disposition": "attachment; filename=university_timetable_export.zip"},
     )

@@ -5,7 +5,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from app.agents import ConstraintAgent, OrchestratorAgent, PolicyModel
-from app.main import JOB_CACHE, app
+from app.main import ADMIN_EMAIL, ADMIN_PASSWORD, JOB_CACHE, app
 from app.io_utils import load_problem_data
 from app.models import ConstraintConfig, SoftConstraintWeights
 
@@ -61,6 +61,8 @@ def test_large_dataset_switches_to_adaptive_mode_and_preserves_hard_constraints(
 
 def test_generate_endpoint_returns_quickly_and_creates_background_job():
     client = TestClient(app)
+    login_response = client.post("/login", data={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD}, follow_redirects=False)
+    assert login_response.status_code == 303
     courses_bytes = Path(r"C:\Users\HP\Downloads\Telegram Desktop\courses(6).csv").read_bytes()
     lecturers_bytes = Path(r"C:\Users\HP\Downloads\Telegram Desktop\lecturers(5).csv").read_bytes()
     rooms_bytes = Path(r"C:\Users\HP\Downloads\Telegram Desktop\rooms(5).csv").read_bytes()
@@ -122,3 +124,58 @@ def test_lecturer_daily_hours_limit():
     
     evaluation = ConstraintAgent().evaluate(problem, assignments, config, weights)
     assert any(item.kind == "lecturer_daily_hours_exceeded" for item in evaluation.hard_violations)
+
+
+def test_missing_lecturer_ids_are_auto_assigned_by_department():
+    courses = BytesIO(
+        b"id,code,title,department,level,student_count,sessions_per_week,duration_hours,room_type\n"
+        b"C1,CSC401,Artificial Intelligence,Computer Science,400,80,1,2,lecture\n"
+        b"C2,CVE201,Engineering Drawing,Civil Engineering,200,65,1,2,lecture\n"
+    )
+    lecturers = BytesIO(
+        b"id,name,departments\n"
+        b"L1,Prof Oyelade,Computer Science|Management and Information Sciences\n"
+    )
+    rooms = BytesIO(
+        b"id,name,capacity,room_type\n"
+        b"R1,Hall A,120,lecture\n"
+    )
+    slots = BytesIO(
+        b"id,day,start,end\n"
+        b"MON_08,Monday,08:00,10:00\n"
+        b"TUE_08,Tuesday,08:00,10:00\n"
+    )
+
+    problem = load_problem_data(
+        type("Upload", (), {"filename": "courses.csv", "file": courses})(),
+        type("Upload", (), {"filename": "lecturers.csv", "file": lecturers})(),
+        type("Upload", (), {"filename": "rooms.csv", "file": rooms})(),
+        type("Upload", (), {"filename": "timeslots.csv", "file": slots})(),
+    )
+
+    assert problem.courses["C1"].lecturer_id == "L1"
+    assert problem.lecturers[problem.courses["C2"].lecturer_id].name == "Dr Akinsete"
+
+
+def test_three_hour_courses_are_split_into_two_sessions():
+    courses = BytesIO(
+        b"id,code,title,department,level,lecturer_id,student_count,sessions_per_week,duration_hours,room_type\n"
+        b"C1,CSC401,Artificial Intelligence,Computer Science,400,L1,80,1,3,lecture\n"
+    )
+    lecturers = BytesIO(b"id,name,departments\nL1,Prof Oyelade,Computer Science\n")
+    rooms = BytesIO(b"id,name,capacity,room_type\nR1,Hall A,120,lecture\n")
+    slots = BytesIO(
+        b"id,day,start,end\n"
+        b"MON_08,Monday,08:00,10:00\n"
+        b"MON_10,Monday,10:00,12:00\n"
+    )
+
+    problem = load_problem_data(
+        type("Upload", (), {"filename": "courses.csv", "file": courses})(),
+        type("Upload", (), {"filename": "lecturers.csv", "file": lecturers})(),
+        type("Upload", (), {"filename": "rooms.csv", "file": rooms})(),
+        type("Upload", (), {"filename": "timeslots.csv", "file": slots})(),
+    )
+
+    durations = sorted(request.duration_hours for request in problem.session_requests)
+    assert durations == [1, 2]

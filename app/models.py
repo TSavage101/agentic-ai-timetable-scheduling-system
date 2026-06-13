@@ -26,6 +26,7 @@ class Room:
 class Lecturer:
     id: str
     name: str
+    departments: frozenset[str] = frozenset()
     unavailable_slots: frozenset[str] = frozenset()
     preferred_slots: frozenset[str] = frozenset()
     max_hours_per_day: int = 4
@@ -75,6 +76,8 @@ class SessionRequest:
     session_id: str
     course_id: str
     index: int
+    duration_hours: int = 1
+    segment_label: str = ""
 
 
 @dataclass

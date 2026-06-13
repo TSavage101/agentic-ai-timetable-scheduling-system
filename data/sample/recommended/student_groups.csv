@@ -1,0 +1,5 @@
+group_id,department,level,group_name,student_count
+CSC_400,Computer Science,400,Computer Science Level 400,85
+MIS_300,Management and Information Sciences,300,MIS Level 300,64
+GST_100,General Studies,100,Foundation Studies Level 100,220
+CVE_200,Civil Engineering,200,Civil Engineering Level 200,72

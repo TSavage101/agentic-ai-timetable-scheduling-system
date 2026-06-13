@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>University Timetable Scheduler</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div class="login-shell">
+    <section class="login-showcase">
+      <div class="login-showcase-card">
+        <span class="login-eyebrow">University Timetable Scheduler</span>
+        <h1>Smarter timetable planning for courses, rooms, and lecturers.</h1>
+        <p>Department-aware lecturer allocation, structured timetable exports, and one focused agentic scheduling flow for university admins.</p>
+
+        <div class="login-feature-list">
+          <div class="login-feature">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+            <span>Lecturers stay aligned to the right academic programs.</span>
+          </div>
+          <div class="login-feature">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+            <span>`3hr` courses are split into realistic `2hr + 1hr` sessions automatically.</span>
+          </div>
+          <div class="login-feature">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="17 8 21 12 17 16"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+            <span>Exports arrive in a cleaner bundle grouped for review and handoff.</span>
+          </div>
+        </div>
+
+        <div class="login-preview-grid" aria-hidden="true">
+          <span></span><span></span><span></span><span></span><span></span><span></span>
+          <span></span><span></span><span></span><span></span><span></span><span></span>
+          <span></span><span></span><span></span><span></span><span></span><span></span>
+        </div>
+      </div>
+    </section>
+
+    <section class="login-panel">
+      <div class="login-form-card">
+        <h2>{{ page_title }}</h2>
+        <p>{{ page_subtitle }}</p>
+        {% if message %}
+        <div class="login-banner">{{ message }}</div>
+        {% endif %}
+        <form action="/login" method="post">
+          <label>
+            <span>Admin Email</span>
+            <input type="email" name="email" value="{{ default_email }}" placeholder="Enter your admin email" required />
+          </label>
+          <label>
+            <span>Password</span>
+            <input type="password" name="password" placeholder="Enter your password" required />
+          </label>
+          <div class="login-meta-row">
+            <span>Single admin entry for the scheduler workspace.</span>
+            <a href="/">Back to Home</a>
+          </div>
+          <button type="submit" class="primary-link run-ai-btn">Sign In</button>
+        </form>
+        <p class="login-helper">Demo credentials are configured in the app for this project workspace.</p>
+      </div>
+    </section>
+  </div>
+</body>
+</html>

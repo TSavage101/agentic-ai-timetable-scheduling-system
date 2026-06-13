@@ -1,0 +1,5 @@
+id,code,title,department,level,student_count,sessions_per_week,duration_hours,room_type,equipment_needed
+C101,CSC401,Artificial Intelligence,Computer Science,400,85,1,3,lecture,
+C102,MIS302,Decision Support Systems,Management and Information Sciences,300,64,2,2,lecture,
+C103,GST111,Communication in English,General Studies,100,220,1,2,lecture,
+C104,CVE201,Engineering Drawing,Civil Engineering,200,72,1,2,lab,projector
