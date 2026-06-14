@@ -43,9 +43,9 @@
           </span>
         </div>
         <div class="signal-gauge-bar" style="width: 100%; height: 6px; margin-top: 4px;">
-          <div class="fill bg-indigo" style="width: 65%;"></div>
+          <div class="fill bg-indigo" style="width: {{ result.room_utilization.get(room.id, 0) }}%;"></div>
         </div>
-        <span style="font-size: 0.72rem; color: var(--text-muted);">Approx. utilization: 65%</span>
+        <span style="font-size: 0.72rem; color: var(--text-muted);">Approx. utilization: {{ result.room_utilization.get(room.id, 0) }}%</span>
       </div>
       {% endfor %}
     </div>
@@ -124,6 +124,7 @@
             <th>Code</th>
             <th>Title</th>
             <th>Lecturer</th>
+            <th>Eligible Lecturers</th>
             <th>Department</th>
             <th>Cohort Sizing</th>
             <th>Facility Needed</th>
@@ -136,6 +137,13 @@
             <td class="font-mono course-code"><strong>{{ course.code }}</strong></td>
             <td class="course-title">{{ course.title }}</td>
             <td class="font-mono">{{ course.lecturer_id }}</td>
+            <td>
+              {% if course.eligible_lecturer_ids %}
+                {{ course.eligible_lecturer_ids|join(', ') }}
+              {% else %}
+                <em>Department matched</em>
+              {% endif %}
+            </td>
             <td>{{ course.department }}</td>
             <td><span class="room-pill">{{ course.student_count }} students</span></td>
             <td><span class="badge badge-indigo">{{ course.room_type|upper }}</span></td>

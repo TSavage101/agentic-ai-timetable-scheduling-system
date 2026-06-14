@@ -22,6 +22,7 @@ COURSE_ALIASES = {
     "student_count": ["student_count", "students", "class_size", "enrollment"],
     "sessions_per_week": ["sessions_per_week", "sessions", "weekly_sessions", "contact_hours"],
     "room_type": ["room_type", "room", "venue_type"],
+    "eligible_lecturer_ids": ["eligible_lecturer_ids", "eligible_lecturers", "allowed_lecturers", "qualified_lecturers"],
     "preferred_slots": ["preferred_slots", "preferred_slot", "preferred_times", "preferred_timeslots"],
     "blocked_slots": ["blocked_slots", "blocked_slot", "restricted_slots", "unavailable_slots"],
     "level": ["level", "year", "academic_level"],
@@ -36,6 +37,8 @@ LECTURER_ALIASES = {
     "id": ["id", "lecturer_id"],
     "name": ["name", "lecturer_name", "full_name"],
     "departments": ["departments", "department", "dept", "specialization", "specializations"],
+    "qualified_course_codes": ["qualified_course_codes", "course_codes", "eligible_course_codes", "can_teach_courses"],
+    "qualified_course_prefixes": ["qualified_course_prefixes", "course_prefixes", "eligible_course_prefixes", "can_teach_prefixes"],
     "unavailable_slots": ["unavailable_slots", "unavailable", "blocked_slots", "restricted_slots"],
     "preferred_slots": ["preferred_slots", "preferred_slot", "preferred_times", "preferred_timeslots"],
     "max_hours_per_day": ["max_hours_per_day", "max_hours_day", "daily_limit", "max_daily_hours"],
@@ -277,6 +280,8 @@ def _build_generated_lecturers(course_rows: List[dict], lecturer_rows: List[dict
             id=lecturer_id,
             name=_clean_scalar(row.get("name"), lecturer_id),
             departments=frozenset(row_departments),
+            qualified_course_codes=frozenset(item.upper() for item in _split_values(row.get("qualified_course_codes"))),
+            qualified_course_prefixes=frozenset(item.upper() for item in _split_values(row.get("qualified_course_prefixes"))),
             unavailable_slots=frozenset(_split_values(row.get("unavailable_slots"))),
             preferred_slots=frozenset(_split_values(row.get("preferred_slots"))),
             max_hours_per_day=max_h_day if max_h_day > 0 else 4,
@@ -303,11 +308,26 @@ def _build_generated_lecturers(course_rows: List[dict], lecturer_rows: List[dict
     return generated
 
 
-def _eligible_lecturers_for_course(lecturers: Dict[str, Lecturer], department: str, course_code: str) -> List[Lecturer]:
+def _eligible_lecturers_for_course(
+    lecturers: Dict[str, Lecturer],
+    department: str,
+    course_code: str,
+    explicit_lecturer_ids: List[str] | None = None,
+) -> List[Lecturer]:
     pool_key = _department_pool_key(department, course_code)
     normalized_department = _normalize_department_name(department)
+    explicit_set = {item for item in (explicit_lecturer_ids or []) if item in lecturers}
+    if explicit_set:
+        return sorted([lecturers[item] for item in explicit_set], key=lambda item: (item.id.startswith("AUTO_"), item.id))
     eligible: List[Lecturer] = []
+    upper_code = course_code.upper()
     for lecturer in lecturers.values():
+        if lecturer.qualified_course_codes and upper_code not in lecturer.qualified_course_codes:
+            if not any(upper_code.startswith(prefix) for prefix in lecturer.qualified_course_prefixes):
+                continue
+        elif lecturer.qualified_course_prefixes and not any(upper_code.startswith(prefix) for prefix in lecturer.qualified_course_prefixes):
+            if upper_code not in lecturer.qualified_course_codes:
+                continue
         if not lecturer.departments:
             if pool_key in {"aldc", "general"}:
                 eligible.append(lecturer)
@@ -413,7 +433,7 @@ def load_problem_data(
 
     courses: Dict[str, Course] = {}
     session_requests: List[SessionRequest] = []
-    course_assignment_counters: Dict[Tuple[str, str], int] = {}
+    lecturer_assignment_counts: Dict[str, int] = {lecturer_id: 0 for lecturer_id in lecturers}
     for row in course_rows:
         course_id = _clean_scalar(row.get("id"))
         code = _clean_scalar(row.get("code"), course_id)
@@ -450,18 +470,25 @@ def load_problem_data(
                     )
 
         requested_lecturer_id = _clean_scalar(row.get("lecturer_id"))
-        eligible_lecturers = _eligible_lecturers_for_course(lecturers, dept, code)
+        explicit_eligible_ids = _split_values(row.get("eligible_lecturer_ids"))
+        eligible_lecturers = _eligible_lecturers_for_course(lecturers, dept, code, explicit_eligible_ids)
         lecturer_id = requested_lecturer_id
-        if lecturer_id not in lecturers or (eligible_lecturers and lecturer_id not in {item.id for item in eligible_lecturers}):
+        eligible_ids = {item.id for item in eligible_lecturers}
+        if lecturer_id not in lecturers or (eligible_lecturers and lecturer_id not in eligible_ids):
             if eligible_lecturers:
-                assignment_key = (dept, _department_pool_key(dept, code))
-                next_index = course_assignment_counters.get(assignment_key, 0)
-                lecturer_id = eligible_lecturers[next_index % len(eligible_lecturers)].id
-                course_assignment_counters[assignment_key] = next_index + 1
+                lecturer_id = min(
+                    eligible_lecturers,
+                    key=lambda item: (lecturer_assignment_counts.get(item.id, 0), item.id.startswith("AUTO_"), item.id),
+                ).id
             elif lecturers:
                 lecturer_id = sorted(lecturers.keys())[0]
             else:
                 raise ValueError(f"No lecturer roster is available for course {code}.")
+        elif explicit_eligible_ids and lecturer_id not in explicit_eligible_ids and eligible_lecturers:
+            lecturer_id = min(
+                eligible_lecturers,
+                key=lambda item: (lecturer_assignment_counts.get(item.id, 0), item.id.startswith("AUTO_"), item.id),
+            ).id
 
         course = Course(
             id=course_id,
@@ -471,6 +498,7 @@ def load_problem_data(
             student_count=student_count,
             sessions_per_week=max(1, _clean_int(row.get("sessions_per_week"), 1)),
             room_type=_normalize_room_type(_clean_scalar(row.get("room_type"), "lecture")),
+            eligible_lecturer_ids=frozenset(explicit_eligible_ids or eligible_ids),
             preferred_slots=frozenset(_split_values(row.get("preferred_slots"))),
             blocked_slots=frozenset(_split_values(row.get("blocked_slots"))),
             level=level,
@@ -481,6 +509,7 @@ def load_problem_data(
             student_group=matched_group_id,
         )
         courses[course_id] = course
+        lecturer_assignment_counts[lecturer_id] = lecturer_assignment_counts.get(lecturer_id, 0) + 1
         segment_plan = [(course.duration_hours, "")] if course.duration_hours != 3 else [(2, "A"), (1, "B")]
         for index in range(1, course.sessions_per_week + 1):
             for duration_hours, segment_label in segment_plan:

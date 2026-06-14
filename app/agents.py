@@ -1257,6 +1257,7 @@ class OrchestratorAgent:
 
         schedule_rows = self._enrich_rows(problem, assignments)
         grid = self._build_grid(problem, assignments, final_evaluation)
+        room_utilization = self._build_room_utilization(problem, assignments)
         activity = self._build_activity_log(strategy, training_summary, optimization_summary, final_evaluation)
         audit_log = self._build_audit_log(problem, assignments, final_evaluation, natural_language_request, guidelines)
         argument_terminal = self._build_argument_terminal(problem, final_evaluation)
@@ -1306,6 +1307,7 @@ class OrchestratorAgent:
             "resolution_suggestions": suggestions,
             "dashboard": dashboard,
             "comparison": comparison,
+            "room_utilization": room_utilization,
             "config": config,
             "weights": weights,
             "guidelines": guidelines,
@@ -1395,6 +1397,24 @@ class OrchestratorAgent:
             "rooms": room_grids,
             "departments": department_grids,
         }
+
+    def _build_room_utilization(self, problem: ProblemData, assignments: List[Assignment]) -> Dict[str, float]:
+        total_available_hours = sum(
+            max(0.5, time_to_hours(slot.end) - time_to_hours(slot.start))
+            for slot in problem.slots.values()
+        )
+        occupied_hours: Dict[str, float] = defaultdict(float)
+        for assignment in assignments:
+            if not assignment.room_id or not assignment.slot_id:
+                continue
+            occupied_hours[assignment.room_id] += session_duration_hours(problem, assignment.session_id, assignment.course_id)
+        utilization: Dict[str, float] = {}
+        for room_id in problem.rooms.keys():
+            if total_available_hours <= 0:
+                utilization[room_id] = 0.0
+            else:
+                utilization[room_id] = round(min(100.0, (occupied_hours.get(room_id, 0.0) / total_available_hours) * 100), 2)
+        return utilization
 
     def _adaptive_summary(
         self,

@@ -27,6 +27,8 @@ class Lecturer:
     id: str
     name: str
     departments: frozenset[str] = frozenset()
+    qualified_course_codes: frozenset[str] = frozenset()
+    qualified_course_prefixes: frozenset[str] = frozenset()
     unavailable_slots: frozenset[str] = frozenset()
     preferred_slots: frozenset[str] = frozenset()
     max_hours_per_day: int = 4
@@ -42,6 +44,7 @@ class Course:
     student_count: int
     sessions_per_week: int
     room_type: str = "lecture"
+    eligible_lecturer_ids: frozenset[str] = frozenset()
     preferred_slots: frozenset[str] = frozenset()
     blocked_slots: frozenset[str] = frozenset()
     level: str = ""
