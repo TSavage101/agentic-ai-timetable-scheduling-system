@@ -46,6 +46,7 @@ class Course:
     blocked_slots: frozenset[str] = frozenset()
     level: str = ""
     department: str = ""
+    location: str = ""
     equipment_needed: frozenset[str] = frozenset()
     duration_hours: int = 1
     student_group: str = ""

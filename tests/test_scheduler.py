@@ -179,3 +179,29 @@ def test_three_hour_courses_are_split_into_two_sessions():
 
     durations = sorted(request.duration_hours for request in problem.session_requests)
     assert durations == [1, 2]
+
+
+def test_course_location_guides_room_assignment():
+    courses = BytesIO(
+        b"id,code,title,department,level,lecturer_id,student_count,sessions_per_week,duration_hours,room_type,location\n"
+        b"C1,CSC401,Artificial Intelligence,Computer Science,400,L1,80,1,2,lecture,CST\n"
+    )
+    lecturers = BytesIO(b"id,name,departments\nL1,Prof Oyelade,Computer Science\n")
+    rooms = BytesIO(
+        b"id,name,capacity,room_type,location\n"
+        b"R1,CLDS Hall,120,lecture,CLDS\n"
+        b"R2,CST Hall,120,lecture,CST\n"
+    )
+    slots = BytesIO(b"id,day,start,end\nMON_08,Monday,08:00,10:00\n")
+
+    problem = load_problem_data(
+        type("Upload", (), {"filename": "courses.csv", "file": courses})(),
+        type("Upload", (), {"filename": "lecturers.csv", "file": lecturers})(),
+        type("Upload", (), {"filename": "rooms.csv", "file": rooms})(),
+        type("Upload", (), {"filename": "timeslots.csv", "file": slots})(),
+    )
+
+    result = OrchestratorAgent().run(problem, strategy="hybrid", training_episodes=0, generations=2)
+    scheduled = [item for item in result["assignments"] if item["status"] == "scheduled"]
+    assert scheduled
+    assert scheduled[0]["room_id"] == "R2"

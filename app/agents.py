@@ -56,6 +56,31 @@ def get_session_interval(problem: ProblemData, assignment: Assignment, slot: obj
     return start, start + dur
 
 
+def _normalize_location(value: str) -> str:
+    return "".join(ch.lower() for ch in value if ch.isalnum())
+
+
+def room_matches_course_location(room: object, course: object) -> bool:
+    if not getattr(course, "location", ""):
+        return True
+    return _normalize_location(getattr(room, "location", "")) == _normalize_location(course.location)
+
+
+def has_location_compatible_room(problem: ProblemData, course: object) -> bool:
+    if not getattr(course, "location", ""):
+        return False
+    for room in problem.rooms.values():
+        if room.room_type != course.room_type:
+            continue
+        if room.capacity < course.student_count:
+            continue
+        if course.equipment_needed.difference(room.equipment):
+            continue
+        if room_matches_course_location(room, course):
+            return True
+    return False
+
+
 class ConstraintAgent:
     def evaluate(
         self,
@@ -162,6 +187,17 @@ class ConstraintAgent:
                     Violation(
                         kind="room_type_mismatch",
                         message=f"{course.code} requires a {course.room_type} room but got {room.room_type}.",
+                        severity="hard",
+                        session_id=assignment.session_id,
+                        weight=3.5,
+                    )
+                )
+
+            if course.location and has_location_compatible_room(problem, course) and not room_matches_course_location(room, course):
+                hard.append(
+                    Violation(
+                        kind="room_location_mismatch",
+                        message=f"{course.code} prefers location {course.location} but was placed in {room.location}.",
                         severity="hard",
                         session_id=assignment.session_id,
                         weight=3.5,
@@ -541,6 +577,7 @@ class SchedulingAgent:
             lecturer = problem.lecturers[course.lecturer_id]
             cohort_key = f"{course.department}-{course.level}".strip("-")
             best_choice: Optional[Tuple[float, str, str]] = None
+            requires_location_match = has_location_compatible_room(problem, course)
 
             for slot in slots:
                 if slot.id in lecturer.unavailable_slots or slot.id in course.blocked_slots:
@@ -551,6 +588,8 @@ class SchedulingAgent:
                     if config.room_capacity_enforced and room.capacity < course.student_count:
                         continue
                     if course.equipment_needed.difference(room.equipment):
+                        continue
+                    if requires_location_match and not room_matches_course_location(room, course):
                         continue
                     if config.room_exclusivity and room_usage.get((slot.id, room.id)):
                         continue
@@ -570,7 +609,9 @@ class SchedulingAgent:
                     penalty += max(0.0, room.capacity - course.student_count) / 40
                     if slot.start >= "16:00":
                         penalty += weights.fatigue_balance
-                    if room.location != "Main Block":
+                    if course.location and room_matches_course_location(room, course):
+                        penalty -= weights.geographic_grouping * 0.6
+                    elif room.location != "Main Block":
                         penalty += weights.geographic_grouping * 0.2
 
                     if policy_model is not None:
@@ -642,6 +683,7 @@ class ConflictResolutionAgent:
             for idx, assignment in enumerate(best):
                 course = problem.courses[assignment.course_id]
                 lecturer = problem.lecturers[course.lecturer_id]
+                requires_location_match = has_location_compatible_room(problem, course)
                 for slot in problem.slots.values():
                     if slot.id in lecturer.unavailable_slots or slot.id in course.blocked_slots:
                         continue
@@ -649,6 +691,8 @@ class ConflictResolutionAgent:
                         if config.room_type_enforced and room.room_type != course.room_type:
                             continue
                         if config.room_capacity_enforced and room.capacity < course.student_count:
+                            continue
+                        if requires_location_match and not room_matches_course_location(room, course):
                             continue
                         candidate = [Assignment(**asdict(item)) for item in best]
                         candidate[idx].slot_id = slot.id
@@ -671,12 +715,15 @@ class ConflictResolutionAgent:
                     break
                 idx = rng.choice(movable)
                 course = problem.courses[best[idx].course_id]
+                requires_location_match = has_location_compatible_room(problem, course)
                 feasible_pairs = []
                 for slot in problem.slots.values():
                     if slot.id in course.blocked_slots or slot.id in problem.lecturers[course.lecturer_id].unavailable_slots:
                         continue
                     for room in problem.rooms.values():
                         if room.room_type == course.room_type and room.capacity >= course.student_count:
+                            if requires_location_match and not room_matches_course_location(room, course):
+                                continue
                             feasible_pairs.append((slot.id, room.id))
                 if feasible_pairs:
                     slot_id, room_id = rng.choice(feasible_pairs)
@@ -758,12 +805,15 @@ class GeneticOptimizationAgent:
         assignment = candidate[idx]
         course = problem.courses[assignment.course_id]
         lecturer = problem.lecturers[course.lecturer_id]
+        requires_location_match = has_location_compatible_room(problem, course)
         feasible_pairs = []
         for slot in problem.slots.values():
             if slot.id in lecturer.unavailable_slots or slot.id in course.blocked_slots:
                 continue
             for room in problem.rooms.values():
                 if room.room_type == course.room_type and room.capacity >= course.student_count:
+                    if requires_location_match and not room_matches_course_location(room, course):
+                        continue
                     feasible_pairs.append((slot.id, room.id))
         if feasible_pairs:
             assignment.slot_id, assignment.room_id = rng.choice(feasible_pairs)
@@ -837,6 +887,7 @@ class CSPSolver:
                     valid_pairs_count = 0
                     course = self.courses[req.course_id]
                     lecturer = self.lecturers[course.lecturer_id]
+                    requires_location_match = has_location_compatible_room(self.problem, course)
                     
                     for slot in self.slots.values():
                         if slot.id in lecturer.unavailable_slots or slot.id in course.blocked_slots:
@@ -862,6 +913,8 @@ class CSPSolver:
                                 continue
                             if course.equipment_needed.difference(room.equipment):
                                 continue
+                            if requires_location_match and not room_matches_course_location(room, course):
+                                continue
                             if check_overlap(start, end, room_schedules[room.id][slot.day]):
                                 continue
                             valid_pairs_count += 1
@@ -885,6 +938,7 @@ class CSPSolver:
 
             course = self.courses[next_req.course_id]
             lecturer = self.lecturers[course.lecturer_id]
+            requires_location_match = has_location_compatible_room(self.problem, course)
 
             # Find and score candidates (value ordering)
             candidates = []
@@ -911,6 +965,8 @@ class CSPSolver:
                         continue
                     if course.equipment_needed.difference(room.equipment):
                         continue
+                    if requires_location_match and not room_matches_course_location(room, course):
+                        continue
                     if check_overlap(start, end, room_schedules[room.id][slot.day]):
                         continue
 
@@ -921,6 +977,8 @@ class CSPSolver:
                     if preferred:
                         score += self.weights.preferred_slot
                     score += room_fit * self.weights.room_fit
+                    if course.location and room_matches_course_location(room, course):
+                        score += self.weights.geographic_grouping
                     if slot.start >= "16:00":
                         score -= self.weights.fatigue_balance
                     
@@ -995,6 +1053,7 @@ class CSPSolver:
             lecturer = self.lecturers[course.lecturer_id]
             student_group = self.problem.student_groups.get(course.student_group)
             group_name = student_group.name if student_group else course.student_group
+            requires_location_match = has_location_compatible_room(self.problem, course)
 
             reasons = []
             suggested_fixes = []
@@ -1039,6 +1098,8 @@ class CSPSolver:
                             group_overlap = check_overlap(start, end, best_group_schedules[course.student_group][slot.day])
 
                             for room in large_enough_rooms:
+                                if requires_location_match and not room_matches_course_location(room, course):
+                                    continue
                                 total_attempts += 1
                                 room_overlap = check_overlap(start, end, best_room_schedules[room.id][slot.day])
                                 if room_overlap:
@@ -1063,6 +1124,10 @@ class CSPSolver:
                         elif lecturer_limit_count > 0:
                             reasons.append(f"Lecturer {lecturer.name} exceeds max daily/weekly teaching hours ({lecturer.max_hours_per_day}h/day, {lecturer.max_hours_per_week}h/week).")
                             suggested_fixes.append("assign another lecturer")
+                        elif requires_location_match:
+                            reasons.append(f"No suitable {course.room_type} room is free in the preferred location {course.location}.")
+                            suggested_fixes.append("add more rooms in the preferred location")
+                            suggested_fixes.append("relax the course location requirement")
                         else:
                             reasons.append("Unresolvable timetable density: no conflict-free timeslot/room combination exists.")
                             suggested_fixes.append("add more timeslots")
@@ -1115,23 +1180,33 @@ class OrchestratorAgent:
         adaptive_summary = self._adaptive_summary(problem, strategy, generations, training_episodes)
         training_summary = None
         effective_training_episodes = adaptive_summary["effective_training_episodes"]
+        effective_strategy = adaptive_summary["effective_strategy"]
         if effective_training_episodes > 0:
             training_summary = self.policy_model.train(problem, episodes=effective_training_episodes)
 
-        policy = self.policy_model if strategy in {"policy", "hybrid", "genetic"} else None
+        policy = self.policy_model if effective_strategy in {"policy", "hybrid", "genetic"} else None
         
         # Heuristic draft schedule (for comparison on the dashboard)
         draft = self.scheduling_agent.generate_initial_schedule(problem, config, weights, policy_model=policy)
+        conflict_reports: Optional[List[ConflictReportEntry]] = []
 
-        # Run Constraint Satisfaction Problem (CSP) Backtracking solver as core engine
-        solver = CSPSolver(problem, config, weights)
-        final_schedule, conflict_reports = solver.solve()
+        if effective_strategy == "heuristic":
+            final_schedule = draft
+        else:
+            # Run Constraint Satisfaction Problem (CSP) Backtracking solver as core engine
+            solver = CSPSolver(problem, config, weights)
+            final_schedule, conflict_reports = solver.solve()
+
+            # Large uploads can exceed the CSP search budget even when the heuristic draft is usable.
+            if not any(item.slot_id for item in final_schedule) and any(item.slot_id for item in draft):
+                final_schedule = draft
+                conflict_reports = []
 
         return self.summarize(
             problem=problem,
             assignments=final_schedule,
             draft_assignments=draft,
-            strategy=strategy,
+            strategy=effective_strategy,
             config=config,
             weights=weights,
             training_summary=training_summary,
@@ -1376,6 +1451,8 @@ class OrchestratorAgent:
         candidate_room = None
         for room in problem.rooms.values():
             if room.room_type == course.room_type and room.capacity >= course.student_count:
+                if has_location_compatible_room(problem, course) and not room_matches_course_location(room, course):
+                    continue
                 candidate_room = room.id
                 break
         target.slot_id = target_slot_id
@@ -1397,6 +1474,7 @@ class OrchestratorAgent:
                     "course_title": course.title,
                     "department": course.department,
                     "level": course.level,
+                    "course_location": course.location or "Any",
                     "lecturer": lecturer.name,
                     "students": course.student_count,
                     "day": slot.day if slot else "Unscheduled",
