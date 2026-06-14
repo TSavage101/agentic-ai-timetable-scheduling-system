@@ -257,9 +257,60 @@ def test_course_can_declare_explicit_eligible_lecturers():
     assert problem.courses["C1"].eligible_lecturer_ids == frozenset({"L1", "L2"})
 
 
+def test_department_normalization_matches_equivalent_names():
+    courses = BytesIO(
+        b"id,code,title,department,level,student_count,sessions_per_week,duration_hours,room_type\n"
+        b"C1,CSC401,Artificial Intelligence,Comp Science,400,80,1,2,lecture\n"
+        b"C2,MIS412,Management Information Systems,Management Information Systems,400,40,1,2,lecture\n"
+    )
+    lecturers = BytesIO(
+        b"id,name,departments\n"
+        b"L1,Prof Oyelade,Computer Science|MIS\n"
+        b"L2,Dr Azu,Biology\n"
+    )
+    rooms = BytesIO(b"id,name,capacity,room_type\nR1,Hall A,120,lecture\n")
+    slots = BytesIO(b"id,day,start,end\nMON_08,Monday,08:00,10:00\n")
+
+    problem = load_problem_data(
+        type("Upload", (), {"filename": "courses.csv", "file": courses})(),
+        type("Upload", (), {"filename": "lecturers.csv", "file": lecturers})(),
+        type("Upload", (), {"filename": "rooms.csv", "file": rooms})(),
+        type("Upload", (), {"filename": "timeslots.csv", "file": slots})(),
+    )
+
+    assert problem.courses["C1"].lecturer_id == "L1"
+    assert problem.courses["C2"].lecturer_id == "L1"
+
+
 def test_room_utilization_is_calculated_per_room():
     problem = load_problem_data()
     result = OrchestratorAgent().run(problem, strategy="hybrid", training_episodes=0, generations=2)
     room_utilization = result["room_utilization"]
     assert room_utilization
     assert len(set(room_utilization.values())) > 1
+
+
+def test_location_priority_prefers_first_then_falls_back():
+    courses = BytesIO(
+        b"id,code,title,department,level,lecturer_id,student_count,sessions_per_week,duration_hours,room_type,location\n"
+        b"C1,DLD111,Foundations of Leadership Development,ALDC,100,L1,80,1,1,lecture,LT|Chapel|ALDC\n"
+    )
+    lecturers = BytesIO(b"id,name,departments\nL1,Prof Adeyemi,ALDC|General Studies\n")
+    rooms = BytesIO(
+        b"id,name,capacity,room_type,location\n"
+        b"R1,ALDC Hall,120,lecture,ALDC\n"
+        b"R2,Chapel Hall,120,lecture,Chapel\n"
+        b"R3,LT Hall,120,lecture,LT\n"
+    )
+    slots = BytesIO(b"id,day,start,end\nMON_08,Monday,08:00,09:00\n")
+
+    problem = load_problem_data(
+        type("Upload", (), {"filename": "courses.csv", "file": courses})(),
+        type("Upload", (), {"filename": "lecturers.csv", "file": lecturers})(),
+        type("Upload", (), {"filename": "rooms.csv", "file": rooms})(),
+        type("Upload", (), {"filename": "timeslots.csv", "file": slots})(),
+    )
+    result = OrchestratorAgent().run(problem, strategy="hybrid", training_episodes=0, generations=2)
+    scheduled = [item for item in result["assignments"] if item["status"] == "scheduled"]
+    assert scheduled
+    assert scheduled[0]["room_id"] == "R3"

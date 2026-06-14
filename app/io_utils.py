@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import re
 import zipfile
+from collections import defaultdict
 from dataclasses import replace
 from pathlib import Path
 from typing import Dict, Iterable, List, Tuple
@@ -182,6 +183,30 @@ DEPARTMENT_GROUPS: Dict[str, List[str]] = {
 }
 
 GENERAL_COURSE_PREFIXES = ("GST", "TMC", "EDS", "DLD", "ALDC")
+DEPARTMENT_SYNONYMS: Dict[str, str] = {
+    "comp science": "computer-science",
+    "computer science": "computer-science",
+    "computer and information sciences": "computer-science",
+    "computer and information science": "computer-science",
+    "mis": "mis",
+    "management information system": "mis",
+    "management information systems": "mis",
+    "management and information sciences": "mis",
+    "management and information science": "mis",
+    "maths": "mathematics",
+    "mathematics": "mathematics",
+    "industrial mathematics": "mathematics",
+    "finance": "finance",
+    "banking and finance": "finance",
+    "banking finance": "finance",
+    "financial technology": "fintech",
+    "fintech": "fintech",
+    "aldc": "aldc-general",
+    "general studies": "aldc-general",
+    "chaplaincy": "aldc-general",
+    "external": "aldc-general",
+    "cmss general": "aldc-general",
+}
 
 
 def _split_values(value: object) -> List[str]:
@@ -247,12 +272,19 @@ def _normalize_room_type(value: str) -> str:
 
 
 def _normalize_department_name(value: str) -> str:
-    return re.sub(r"[^a-z0-9]+", " ", value.lower()).strip()
+    normalized = re.sub(r"[^a-z0-9]+", " ", value.lower()).strip()
+    return DEPARTMENT_SYNONYMS.get(normalized, normalized.replace(" ", "-"))
 
 
 def _department_pool_key(department: str, course_code: str = "") -> str:
     normalized = _normalize_department_name(department)
     if any(course_code.upper().startswith(prefix) for prefix in GENERAL_COURSE_PREFIXES):
+        return "aldc"
+    if normalized == "computer-science":
+        return "cst"
+    if normalized in {"mis", "finance"}:
+        return "cmss"
+    if normalized == "aldc-general":
         return "aldc"
     for pool_key, entries in DEPARTMENT_GROUPS.items():
         if normalized in (_normalize_department_name(item) for item in entries):
@@ -358,6 +390,26 @@ def _eligible_lecturers_for_course(
     return sorted(eligible, key=lambda item: (item.id.startswith("AUTO_"), item.id))
 
 
+def _select_lecturer_for_course(
+    eligible_lecturers: List[Lecturer],
+    department_pool: str,
+    lecturer_assignment_counts: Dict[str, int],
+    lecturer_department_pool_counts: Dict[Tuple[str, str], int],
+) -> str | None:
+    if not eligible_lecturers:
+        return None
+    real_lecturers = [item for item in eligible_lecturers if not item.id.startswith("AUTO_")]
+    candidates = real_lecturers or eligible_lecturers
+    return min(
+        candidates,
+        key=lambda item: (
+            lecturer_department_pool_counts.get((item.id, department_pool), 0),
+            lecturer_assignment_counts.get(item.id, 0),
+            item.id,
+        ),
+    ).id
+
+
 def _load_dataframe(upload, fallback_name: str) -> pd.DataFrame:
     if upload is not None and getattr(upload, "filename", ""):
         raw = upload.file.read()
@@ -434,6 +486,7 @@ def load_problem_data(
     courses: Dict[str, Course] = {}
     session_requests: List[SessionRequest] = []
     lecturer_assignment_counts: Dict[str, int] = {lecturer_id: 0 for lecturer_id in lecturers}
+    lecturer_department_pool_counts: Dict[Tuple[str, str], int] = defaultdict(int)
     for row in course_rows:
         course_id = _clean_scalar(row.get("id"))
         code = _clean_scalar(row.get("code"), course_id)
@@ -474,21 +527,26 @@ def load_problem_data(
         eligible_lecturers = _eligible_lecturers_for_course(lecturers, dept, code, explicit_eligible_ids)
         lecturer_id = requested_lecturer_id
         eligible_ids = {item.id for item in eligible_lecturers}
+        department_pool = _department_pool_key(dept, code)
         if lecturer_id not in lecturers or (eligible_lecturers and lecturer_id not in eligible_ids):
             if eligible_lecturers:
-                lecturer_id = min(
+                lecturer_id = _select_lecturer_for_course(
                     eligible_lecturers,
-                    key=lambda item: (lecturer_assignment_counts.get(item.id, 0), item.id.startswith("AUTO_"), item.id),
-                ).id
+                    department_pool,
+                    lecturer_assignment_counts,
+                    lecturer_department_pool_counts,
+                ) or lecturer_id
             elif lecturers:
                 lecturer_id = sorted(lecturers.keys())[0]
             else:
                 raise ValueError(f"No lecturer roster is available for course {code}.")
         elif explicit_eligible_ids and lecturer_id not in explicit_eligible_ids and eligible_lecturers:
-            lecturer_id = min(
+            lecturer_id = _select_lecturer_for_course(
                 eligible_lecturers,
-                key=lambda item: (lecturer_assignment_counts.get(item.id, 0), item.id.startswith("AUTO_"), item.id),
-            ).id
+                department_pool,
+                lecturer_assignment_counts,
+                lecturer_department_pool_counts,
+            ) or lecturer_id
 
         course = Course(
             id=course_id,
@@ -510,6 +568,7 @@ def load_problem_data(
         )
         courses[course_id] = course
         lecturer_assignment_counts[lecturer_id] = lecturer_assignment_counts.get(lecturer_id, 0) + 1
+        lecturer_department_pool_counts[(lecturer_id, department_pool)] += 1
         segment_plan = [(course.duration_hours, "")] if course.duration_hours != 3 else [(2, "A"), (1, "B")]
         for index in range(1, course.sessions_per_week + 1):
             for duration_hours, segment_label in segment_plan:
