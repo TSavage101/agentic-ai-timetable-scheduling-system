@@ -1,6 +1,5 @@
 from dataclasses import replace
 from io import BytesIO
-from pathlib import Path
 
 from fastapi.testclient import TestClient
 
@@ -8,6 +7,38 @@ from app.agents import ConstraintAgent, OrchestratorAgent, PolicyModel
 from app.main import ADMIN_EMAIL, ADMIN_PASSWORD, JOB_CACHE, app
 from app.io_utils import load_problem_data
 from app.models import ConstraintConfig, SoftConstraintWeights
+
+
+def _make_large_problem_uploads():
+    course_rows = [
+        "id,code,title,department,level,lecturer_id,student_count,sessions_per_week,room_type"
+    ]
+    for i in range(60):
+        course_rows.append(
+            f"C{i},CSC{300 + i},Course {i},Computer Science,{300 + (i % 4) * 100},L{i % 6},{50 + (i % 25)},2,lecture"
+        )
+    lecturer_rows = ["id,name,departments,max_hours_per_day,max_hours_per_week"] + [
+        f"L{i},Lecturer {i},Computer Science,10,40" for i in range(6)
+    ]
+    room_rows = ["id,name,capacity,room_type"] + [
+        f"R{i},Room {i},{120 + i},lecture" for i in range(60)
+    ]
+    slot_rows = ["id,day,start,end"]
+    days = [
+        "Monday", "Tuesday", "Wednesday", "Thursday", "Friday",
+        "Saturday", "Sunday", "Weekday8", "Weekday9", "Weekday10",
+    ]
+    time_pairs = [(f"{hour:02d}:00", f"{hour + 1:02d}:00") for hour in range(8, 18)]
+    day_codes = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN", "D08", "D09", "D10"]
+    for day_code, day_name in zip(day_codes, days):
+        for start, end in time_pairs:
+            slot_rows.append(f"{day_code}_{start[:2]}{start[3:5]},{day_name},{start},{end}")
+    return (
+        BytesIO("\n".join(course_rows).encode()),
+        BytesIO("\n".join(lecturer_rows).encode()),
+        BytesIO("\n".join(room_rows).encode()),
+        BytesIO("\n".join(slot_rows).encode()),
+    )
 
 
 def test_sample_dataset_generates_schedule_without_hard_violations():
@@ -43,18 +74,15 @@ def test_genetic_strategy_runs_without_hard_violations():
 
 
 def test_large_dataset_switches_to_adaptive_mode_and_preserves_hard_constraints():
-    courses_bytes = Path(r"C:\Users\HP\Downloads\Telegram Desktop\courses(6).csv").read_bytes()
-    lecturers_bytes = Path(r"C:\Users\HP\Downloads\Telegram Desktop\lecturers(5).csv").read_bytes()
-    rooms_bytes = Path(r"C:\Users\HP\Downloads\Telegram Desktop\rooms(5).csv").read_bytes()
-    slots_bytes = Path(r"C:\Users\HP\Downloads\Telegram Desktop\timeslots(5).csv").read_bytes()
+    courses_bytes, lecturers_bytes, rooms_bytes, slots_bytes = _make_large_problem_uploads()
     problem = load_problem_data(
-        type("Upload", (), {"filename": "courses.csv", "file": BytesIO(courses_bytes)})(),
-        type("Upload", (), {"filename": "lecturers.csv", "file": BytesIO(lecturers_bytes)})(),
-        type("Upload", (), {"filename": "rooms.csv", "file": BytesIO(rooms_bytes)})(),
-        type("Upload", (), {"filename": "timeslots.csv", "file": BytesIO(slots_bytes)})(),
+        type("Upload", (), {"filename": "courses.csv", "file": courses_bytes})(),
+        type("Upload", (), {"filename": "lecturers.csv", "file": lecturers_bytes})(),
+        type("Upload", (), {"filename": "rooms.csv", "file": rooms_bytes})(),
+        type("Upload", (), {"filename": "timeslots.csv", "file": slots_bytes})(),
     )
     result = OrchestratorAgent().run(problem, strategy="hybrid", training_episodes=0, generations=4)
-    assert result["adaptive_summary"]["very_large_problem"] is True
+    assert result["adaptive_summary"]["large_problem"] is True
     assert result["adaptive_summary"]["effective_strategy"] == "heuristic"
     assert len(result["final_evaluation"].hard_violations) == 0
 
@@ -63,15 +91,12 @@ def test_generate_endpoint_returns_quickly_and_creates_background_job():
     client = TestClient(app)
     login_response = client.post("/login", data={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD}, follow_redirects=False)
     assert login_response.status_code == 303
-    courses_bytes = Path(r"C:\Users\HP\Downloads\Telegram Desktop\courses(6).csv").read_bytes()
-    lecturers_bytes = Path(r"C:\Users\HP\Downloads\Telegram Desktop\lecturers(5).csv").read_bytes()
-    rooms_bytes = Path(r"C:\Users\HP\Downloads\Telegram Desktop\rooms(5).csv").read_bytes()
-    slots_bytes = Path(r"C:\Users\HP\Downloads\Telegram Desktop\timeslots(5).csv").read_bytes()
+    courses_bytes, lecturers_bytes, rooms_bytes, slots_bytes = _make_large_problem_uploads()
     files = {
-        "courses": ("courses.csv", BytesIO(courses_bytes), "text/csv"),
-        "lecturers": ("lecturers.csv", BytesIO(lecturers_bytes), "text/csv"),
-        "rooms": ("rooms.csv", BytesIO(rooms_bytes), "text/csv"),
-        "timeslots": ("timeslots.csv", BytesIO(slots_bytes), "text/csv"),
+        "courses": ("courses.csv", courses_bytes, "text/csv"),
+        "lecturers": ("lecturers.csv", lecturers_bytes, "text/csv"),
+        "rooms": ("rooms.csv", rooms_bytes, "text/csv"),
+        "timeslots": ("timeslots.csv", slots_bytes, "text/csv"),
     }
     response = client.post("/generate", files=files, data={"strategy": "hybrid", "training_episodes": "0", "generations": "4"})
     assert response.status_code == 200

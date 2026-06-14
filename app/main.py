@@ -5,6 +5,7 @@ import io
 import json
 import traceback
 import uuid
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -26,6 +27,7 @@ orchestrator = OrchestratorAgent()
 EXPORT_CACHE: Dict[str, object] = {}
 RUN_CACHE: Dict[str, Dict[str, Any]] = {}
 JOB_CACHE: Dict[str, Dict[str, Any]] = {}
+LATEST_RUN_ID: Optional[str] = None
 AUTH_COOKIE = "uts_admin"
 ADMIN_EMAIL = "admin@university.edu.ng"
 ADMIN_PASSWORD = "admin123"
@@ -44,9 +46,7 @@ NAV_ITEMS = [
 
 
 def _latest_run_id() -> Optional[str]:
-    if not RUN_CACHE:
-        return None
-    return list(RUN_CACHE.keys())[-1]
+    return LATEST_RUN_ID
 
 
 def _is_authenticated(request: Request) -> bool:
@@ -220,9 +220,8 @@ def _apply_natural_language(problem: ProblemData, prompt: str) -> ProblemData:
                     morning_match = slot.start <= "12:00"
                     if not day_match or (morning_only and not morning_match):
                         blocked.add(slot.id)
-                updated.lecturers[lecturer_id] = type(lecturer)(
-                    id=lecturer.id,
-                    name=lecturer.name,
+                updated.lecturers[lecturer_id] = replace(
+                    lecturer,
                     unavailable_slots=frozenset(blocked),
                 )
     return updated
@@ -240,9 +239,8 @@ def _apply_preference_rows(problem: ProblemData, preference_rows: List[Dict[str,
             for slot in updated.slots.values():
                 if row["day"] and slot.day != row["day"]:
                     unavailable.add(slot.id)
-            updated.lecturers[lecturer_id] = type(lecturer)(
-                id=lecturer.id,
-                name=lecturer.name,
+            updated.lecturers[lecturer_id] = replace(
+                lecturer,
                 unavailable_slots=frozenset(unavailable.difference({row["slot"]})),
             )
     return updated
@@ -258,9 +256,8 @@ def _apply_disruptions(problem: ProblemData, disruptions: List[Dict[str, str]]) 
             continue
         if disruption_type == "lecturer_unavailable" and target_id in updated.lecturers:
             lecturer = updated.lecturers[target_id]
-            updated.lecturers[target_id] = type(lecturer)(
-                id=lecturer.id,
-                name=lecturer.name,
+            updated.lecturers[target_id] = replace(
+                lecturer,
                 unavailable_slots=frozenset(set(lecturer.unavailable_slots) | {slot_id}),
             )
     return updated
@@ -367,6 +364,7 @@ def _store_run(
     nl_request: str,
     disruption_rows: List[Dict[str, str]],
 ) -> str:
+    global LATEST_RUN_ID
     run_id = str(uuid.uuid4())
     RUN_CACHE[run_id] = {
         "problem": problem,
@@ -393,6 +391,7 @@ def _store_run(
         "result": result,
         "conflict_reports": result.get("conflict_reports", []),
     }
+    LATEST_RUN_ID = run_id
     return run_id
 
 

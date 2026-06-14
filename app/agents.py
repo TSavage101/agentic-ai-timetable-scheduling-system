@@ -4,6 +4,7 @@ import json
 import random
 from collections import defaultdict
 from dataclasses import asdict, replace
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -23,6 +24,7 @@ from .models import (
 
 MODEL_DIR = Path(__file__).resolve().parent.parent / "data" / "models"
 MODEL_DIR.mkdir(parents=True, exist_ok=True)
+HARD_PENALTY_SCALE = 6.0
 
 
 def time_to_hours(time_str: str) -> float:
@@ -345,7 +347,7 @@ class ConstraintAgent:
         geographic_penalties = 0
         for (lecturer_id, day), slot_ids in lecturer_day_slots.items():
             sorted_slots = sorted(slot_ids, key=lambda sid: (slots[sid].start, slots[sid].end))
-            streak = self._max_consecutive(sorted_slots)
+            streak = self._max_consecutive(sorted_slots, slots)
             if config.fatigue_limit_enabled and streak > config.max_consecutive_sessions:
                 fatigue_hits += 1
                 soft.append(
@@ -360,7 +362,7 @@ class ConstraintAgent:
         for (cohort_key, day), slot_ids in cohort_day_slots.items():
             sorted_slots = sorted(slot_ids, key=lambda sid: (slots[sid].start, slots[sid].end))
             idle_penalties += self._idle_gaps(sorted_slots, slots)
-            if config.fatigue_limit_enabled and self._max_consecutive(sorted_slots) > config.max_consecutive_sessions:
+            if config.fatigue_limit_enabled and self._max_consecutive(sorted_slots, slots) > config.max_consecutive_sessions:
                 fatigue_hits += 1
                 soft.append(
                     Violation(
@@ -396,7 +398,7 @@ class ConstraintAgent:
 
         hard_penalty = sum(item.weight for item in hard)
         soft_penalty = sum(item.weight for item in soft)
-        hard_score = max(0, round(100 - hard_penalty * 6))
+        hard_score = max(0, round(100 - hard_penalty * HARD_PENALTY_SCALE))
         soft_score = max(0, round(100 - soft_penalty * 2.3))
         total_score = round(hard_score * 0.6 + soft_score * 0.4)
         scheduled = len(assignments) - unscheduled_count
@@ -411,7 +413,7 @@ class ConstraintAgent:
             metrics={
                 "scheduled_sessions": float(scheduled),
                 "unscheduled_sessions": float(unscheduled_count),
-                "hard_constraint_satisfaction": round(max(0.0, 100 - hard_penalty * 5.5), 2),
+                "hard_constraint_satisfaction": round(max(0.0, 100 - hard_penalty * HARD_PENALTY_SCALE), 2),
                 "soft_constraint_quality": round(max(0.0, 100 - soft_penalty * 2.1), 2),
                 "fatigue_index": round(min(100.0, fatigue_hits * 15.0), 2),
                 "student_idle_index": round(min(100.0, idle_penalties * 8.0), 2),
@@ -421,26 +423,24 @@ class ConstraintAgent:
         )
 
     @staticmethod
-    def _max_consecutive(slot_ids: List[str]) -> int:
+    def _max_consecutive(slot_ids: List[str], slots: Dict[str, object]) -> int:
         if not slot_ids:
             return 0
+        sorted_ids = sorted(slot_ids, key=lambda sid: time_to_hours(slots[sid].start))
         consecutive = 1
         best = 1
-        previous_start = None
-        for slot_id in slot_ids:
-            current_start = slot_id.split("_", 1)[1]
-            if previous_start is not None and current_start == previous_start:
+        for previous_id, current_id in zip(sorted_ids, sorted_ids[1:]):
+            if slots[previous_id].end == slots[current_id].start:
                 consecutive += 1
             else:
                 consecutive = 1
             best = max(best, consecutive)
-            previous_start = current_start
         return best
 
     @staticmethod
     def _idle_gaps(slot_ids: List[str], slots: Dict[str, object]) -> int:
         gap_count = 0
-        sorted_slots = sorted(slot_ids, key=lambda sid: slots[sid].start)
+        sorted_slots = sorted(slot_ids, key=lambda sid: time_to_hours(slots[sid].start))
         for current, nxt in zip(sorted_slots, sorted_slots[1:]):
             if slots[current].end != slots[nxt].start:
                 gap_count += 1
@@ -494,6 +494,8 @@ class PolicyModel:
         for _ in range(max(0, episodes)):
             reward_total = 0.0
             course_day_usage: Dict[str, set[str]] = defaultdict(set)
+            episode_room_usage: Dict[Tuple[str, str], bool] = {}
+            episode_lecturer_usage: Dict[Tuple[str, str], bool] = {}
             requests = problem.session_requests[:]
             rng.shuffle(requests)
             for request in requests:
@@ -503,8 +505,12 @@ class PolicyModel:
                 for slot in problem.slots.values():
                     if slot.id in lecturer.unavailable_slots or slot.id in course.blocked_slots:
                         continue
+                    if episode_lecturer_usage.get((slot.id, course.lecturer_id)):
+                        continue
                     for room in problem.rooms.values():
                         if room.room_type != course.room_type or room.capacity < course.student_count:
+                            continue
+                        if episode_room_usage.get((slot.id, room.id)):
                             continue
                         room_fit = 1.0 - ((room.capacity - course.student_count) / max(1, room.capacity))
                         features = self.feature_map(
@@ -517,7 +523,10 @@ class PolicyModel:
                         feasible.append((slot, room, features))
                 if not feasible:
                     continue
-                _, _, features = rng.choice(feasible)
+                slot_chosen, room_chosen, features = rng.choice(feasible)
+                episode_room_usage[(slot_chosen.id, room_chosen.id)] = True
+                episode_lecturer_usage[(slot_chosen.id, course.lecturer_id)] = True
+                course_day_usage[course.id].add(slot_chosen.day)
                 reward = (
                     4.0 * features["preferred_slot"]
                     - 2.7 * features["late_slot"]
@@ -575,7 +584,7 @@ class SchedulingAgent:
         for request in ordered_requests:
             course = problem.courses[request.course_id]
             lecturer = problem.lecturers[course.lecturer_id]
-            cohort_key = f"{course.department}-{course.level}".strip("-")
+            cohort_key = course.student_group or f"{course.department}-{course.level}".strip("-")
             best_choice: Optional[Tuple[float, str, str]] = None
             requires_location_match = has_location_compatible_room(problem, course)
 
@@ -680,6 +689,8 @@ class ConflictResolutionAgent:
 
         for _ in range(max_rounds):
             improved = False
+            best_candidate: Optional[List[Assignment]] = None
+            best_candidate_eval = best_eval
             for idx, assignment in enumerate(best):
                 course = problem.courses[assignment.course_id]
                 lecturer = problem.lecturers[course.lecturer_id]
@@ -700,15 +711,14 @@ class ConflictResolutionAgent:
                         candidate[idx].status = "scheduled"
                         candidate[idx].notes = []
                         candidate_eval = self.constraint_agent.evaluate(problem, candidate, config, weights)
-                        if self._ranking_key(candidate_eval) > self._ranking_key(best_eval):
-                            best = candidate
-                            best_eval = candidate_eval
+                        if self._ranking_key(candidate_eval) > self._ranking_key(best_candidate_eval):
+                            best_candidate = candidate
+                            best_candidate_eval = candidate_eval
                             improved = True
-                            break
-                    if improved:
-                        break
-                if improved:
-                    break
+            if improved and best_candidate is not None:
+                best = best_candidate
+                best_eval = best_candidate_eval
+                continue
             if not improved:
                 movable = [i for i, item in enumerate(best) if item.status == "scheduled"]
                 if not movable:
@@ -872,7 +882,7 @@ class CSPSolver:
                     return True
             return False
 
-        def search(req_index: int) -> bool:
+        def search() -> bool:
             nonlocal backtrack_count, timeout_reached, best_scheduled_count, best_assignments
             
             backtrack_count += 1
@@ -1001,7 +1011,7 @@ class CSPSolver:
                 lecturer_daily_hours[course.lecturer_id][slot.day] += dur
                 lecturer_weekly_hours[course.lecturer_id] += dur
 
-                if search(req_index + 1):
+                if search():
                     return True
 
                 # Backtrack
@@ -1021,7 +1031,7 @@ class CSPSolver:
 
             return False
 
-        search(0)
+        search()
 
         # Build conflict reports for any unscheduled sessions
         conflict_reports: List[ConflictReportEntry] = []
@@ -1253,8 +1263,7 @@ class OrchestratorAgent:
         suggestions = self._build_suggestions(problem, assignments, final_evaluation)
 
         if conflict_reports is None:
-            solver = CSPSolver(problem, config, weights)
-            _, conflict_reports = solver.solve()
+            conflict_reports = []
 
         grouped_grids = self._build_filtered_grids(problem, assignments, final_evaluation)
         grouped_grids["global"] = {
@@ -1269,6 +1278,7 @@ class OrchestratorAgent:
             "total_lecturers": len(problem.lecturers),
             "total_rooms": len(problem.rooms),
             "operational_status": "Approved" if approved else ("Attention Needed" if final_evaluation.hard_violations else "Ready for Review"),
+            "run_timestamp": datetime.now().strftime("%b %d, %Y %H:%M"),
         }
 
         comparison = [
@@ -1450,11 +1460,16 @@ class OrchestratorAgent:
         course = problem.courses[target.course_id]
         candidate_room = None
         for room in problem.rooms.values():
-            if room.room_type == course.room_type and room.capacity >= course.student_count:
-                if has_location_compatible_room(problem, course) and not room_matches_course_location(room, course):
-                    continue
-                candidate_room = room.id
-                break
+            if room.room_type != course.room_type:
+                continue
+            if room.capacity < course.student_count:
+                continue
+            if course.equipment_needed.difference(room.equipment):
+                continue
+            if has_location_compatible_room(problem, course) and not room_matches_course_location(room, course):
+                continue
+            candidate_room = room.id
+            break
         target.slot_id = target_slot_id
         target.room_id = candidate_room
         target.notes = [f"Administrator moved this session to {target_slot_id} for what-if testing."]
